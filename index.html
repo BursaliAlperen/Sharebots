@@ -271,14 +271,6 @@
         const room = new WebsimSocket();
 
         document.addEventListener('DOMContentLoaded', () => {
-            const tg = window.Telegram.WebApp;
-            try {
-                tg.ready();
-                tg.expand();
-            } catch (e) {
-                console.warn("Telegram WebApp script not found or failed. Running in browser mode.");
-            }
-
             // --- TRANSLATIONS ---
             const translations = {
                 tr: {
@@ -469,7 +461,9 @@
                     return;
                 }
 
-                if (currentUserData.points < 10) {
+                const latestUserData = room.collection('users_v3').getList().find(u => u.id === currentUserData.id);
+
+                if (!latestUserData || latestUserData.points < 10) {
                     showToast(T.notEnoughPointsError, 'error');
                     return;
                 }
@@ -477,15 +471,14 @@
                 addBotBtn.disabled = true;
 
                 try {
-                    await room.collection('users_v3').update(currentUserData.id, { points: currentUserData.points - 10 });
+                    await room.collection('users_v3').update(latestUserData.id, { points: latestUserData.points - 10 });
                     await room.collection('botLinks_v3').create({ url: link, ownerId: currentUser.id });
                     addBotInput.value = '';
                     showToast(T.botAddedSuccess);
                 } catch(e) {
                     console.error("Error adding bot:", e);
                     showToast(T.botAddError, 'error');
-                    // Revert points if bot creation failed but points were deducted (simplified: just show error)
-                    updateUI();
+                    // Subscriptions will eventually update the UI to the correct state.
                 }
             };
 
@@ -497,8 +490,14 @@
                 watchAdBtn.textContent = T.adLoading;
 
                 show_9448585().then(async () => {
-                    await room.collection('users_v3').update(currentUserData.id, { points: currentUserData.points + 10 });
-                    showToast(T.adWatchedSuccess);
+                    const latestUserData = room.collection('users_v3').getList().find(u => u.id === currentUserData.id);
+                    if (latestUserData) {
+                        await room.collection('users_v3').update(latestUserData.id, { points: latestUserData.points + 10 });
+                        showToast(T.adWatchedSuccess);
+                    } else {
+                        console.error("Could not find user to update points after ad.");
+                        showToast(T.adError, 'error');
+                    }
                 }).catch((error) => {
                     showToast(T.adError, 'error');
                     console.error("Ad error:", error);
@@ -542,22 +541,25 @@
                     }
 
                     if(currentUserData && visitTask.chosenBot) {
-                        const ownerRecord = allUsers.find(u => u.userId === visitTask.chosenBot.ownerId);
+                        const latestAllUsers = room.collection('users_v3').getList();
+                        const ownerRecord = latestAllUsers.find(u => u.userId === visitTask.chosenBot.ownerId);
 
                         if (ownerRecord && ownerRecord.points >= 10) {
                             await room.collection('users_v3').update(ownerRecord.id, { points: ownerRecord.points - 10 });
                         }
 
-                        const updatedVisitedBots = [...(currentUserData.visitedBots || []), visitTask.chosenBot.url];
-                        await room.collection('users_v3').update(currentUserData.id, { 
-                            points: currentUserData.points + 10,
-                            visitedBots: updatedVisitedBots
-                        });
-                        
-                        showToast(T.visitTaskCompleted);
+                        const latestCurrentUserData = latestAllUsers.find(u => u.id === currentUserData.id);
+                        if(latestCurrentUserData) {
+                            const updatedVisitedBots = [...(latestCurrentUserData.visitedBots || []), visitTask.chosenBot.url];
+                            await room.collection('users_v3').update(latestCurrentUserData.id, { 
+                                points: latestCurrentUserData.points + 10,
+                                visitedBots: updatedVisitedBots
+                            });
+                            showToast(T.visitTaskCompleted);
+                        }
                     }
                 } catch (error) {
-                    console.error('Ad error during visit task:', error);
+                    console.error('Ad error or DB error during visit task:', error);
                     showToast(T.adErrorDuringVisit, 'error');
                 } finally {
                     resetVisitTask();
@@ -632,16 +634,47 @@
 
             // --- INITIALIZATION ---
             const initialize = async () => {
+                const T = translations[currentLanguage];
+                let userId = null;
+                let username = T.guest;
+                const tg = window.Telegram.WebApp;
+
                 try {
-                    currentUser = await window.websim.getCurrentUser();
-                    if (!currentUser || !currentUser.id) { throw new Error("Not logged in."); }
-                } catch(e) {
-                    console.warn("Could not get current user. Running in guest mode.");
-                    const T = translations[currentLanguage];
-                    const guestId = localStorage.getItem('botPointsGuestId') || 'guest-' + Date.now();
-                    localStorage.setItem('botPointsGuestId', guestId);
-                    currentUser = { id: guestId, username: T.guest };
+                    tg.ready();
+                    tg.expand();
+                    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        userId = `tg-${tg.initDataUnsafe.user.id}`;
+                        username = tg.initDataUnsafe.user.username || `${tg.initDataUnsafe.user.first_name} ${tg.initDataUnsafe.user.last_name || ''}`.trim();
+                        console.log('Using Telegram user:', username, userId);
+                    }
+                } catch (e) {
+                    console.warn("Telegram WebApp not available. Trying other methods.");
                 }
+
+                if (!userId) {
+                    try {
+                        const websimUser = await window.websim.getCurrentUser();
+                        if (websimUser && websimUser.id) {
+                            userId = websimUser.id;
+                            username = websimUser.username;
+                            console.log('Using Websim user:', username, userId);
+                        }
+                    } catch (e) {
+                        console.warn("Could not get Websim user. Falling back to guest mode.");
+                    }
+                }
+                
+                if (!userId) {
+                    userId = localStorage.getItem('botPointsGuestId');
+                    if (!userId) {
+                        userId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+                        localStorage.setItem('botPointsGuestId', userId);
+                    }
+                    username = T.guest;
+                    console.log('Using Guest user:', userId);
+                }
+                
+                currentUser = { id: userId, username: username };
 
                 room.collection('users_v3').subscribe(users => {
                     allUsers = users.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -651,7 +684,9 @@
                     if (!userRecord) {
                         // Debounce creation to avoid race conditions on first load
                         setTimeout(() => {
-                            if (!allUsers.some(u => u.userId === currentUser.id)) {
+                            // Check again with the latest user list
+                            const latestUsers = room.collection('users_v3').getList();
+                            if (!latestUsers.some(u => u.userId === currentUser.id)) {
                                 room.collection('users_v3').create({
                                     userId: currentUser.id,
                                     username: currentUser.username,
@@ -661,6 +696,11 @@
                             }
                         }, 500 + Math.random() * 500);
                     } else {
+                        // If username in DB is different from current one (e.g., from Telegram), update it.
+                        // Don't update if the new username is "Guest", as that might be a fallback.
+                        if (userRecord.username !== currentUser.username && currentUser.username !== T.guest) {
+                           room.collection('users_v3').update(userRecord.id, { username: currentUser.username });
+                        }
                         currentUserData = userRecord;
                     }
                     updateUI();
