@@ -46,6 +46,20 @@
             border: 1px solid var(--border-color);
         }
 
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--error-color); /* Default to red */
+            margin-right: 8px;
+            transition: background-color 0.5s;
+            flex-shrink: 0;
+        }
+        .status-dot.connected {
+            background-color: var(--success-color);
+        }
+
         .lang-switcher {
             text-align: center;
             padding-top: 15px;
@@ -222,6 +236,7 @@
     <div class="app-container">
         <div class="header">
             <div class="user-info">
+                <span id="connection-status" title="Bağlantı Durumu" class="status-dot"></span>
                 <span>👤</span>
                 <span id="username">Guest</span>
             </div>
@@ -238,7 +253,7 @@
 
         <div id="visit-task-card" class="card">
             <h2 data-key="visitTaskTitle">Bot Ziyareti Görevi</h2>
-            <p data-key="visitTaskDesc">Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.</p>
+            <p data-key="visitTaskDesc">Görevi tamamlamak için linke tıklayın ve botu ziyaret edin. Ödülü almak için en az 5 saniye sonra bu sayfaya geri dönmelisiniz. Pencereden ayrılırsanız görev iptal olur.</p>
             <a id="visit-bot-link" href="#" target="_blank" rel="noopener noreferrer" data-key="visitBotLink">Bot Linki</a>
             <div id="timer">5</div>
             <button id="cancel-visit-btn" class="btn" data-key="cancelBtn" style="margin-top: 10px;">İptal Et</button>
@@ -267,7 +282,19 @@
     </div>
 
     <script>
-        // Setup Websim room at global scope
+        /*
+            ÖNEMLİ NOT:
+            Bu uygulama, verileri canlı ve tüm kullanıcılar arasında senkronize tutmak için
+            WebsimSocket adında bir simülasyon aracı kullanır. Bu, birisi bot eklediğinde
+            herkesin anında görmesini sağlar. Puanlarınız ve botlarınız bu "canlı veritabanına"
+            kaydedilir.
+
+            Bu kodu kendi web sitenize entegre ettiğinizde, 'websim-socket.js' dosyasının
+            düzgün çalıştığından veya bu işlevsellik için Firebase, Supabase gibi
+            gerçek zamanlı bir veritabanı kullandığınızdan emin olmalısınız.
+            Tarayıcı belleği (localStorage) tek başına diğer kullanıcıların
+            değişikliklerini canlı olarak göstermeye yetmez.
+        */
         const room = new WebsimSocket();
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -280,7 +307,7 @@
                     watchAdBtn: '🎬 Reklam İzle (+10 Puan)',
                     visitBotBtn: '🎯 Bot Ziyaret Et (+10 Puan)',
                     visitTaskTitle: 'Bot Ziyareti Görevi',
-                    visitTaskDesc: 'Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.',
+                    visitTaskDesc: 'Görevi tamamlamak için linke tıklayın ve botu ziyaret edin. Ödülü almak için en az 5 saniye sonra bu sayfaya geri dönmelisiniz. Pencereden ayrılırsanız görev iptal olur.',
                     visitBotLink: 'Bot Linki',
                     addYourBotTitle: 'Botunu Ekle',
                     addYourBotDesc: 'Botunuzun referans linkini ekleyerek başkalarının ziyaret etmesini sağlayın. Bu işlem 10 puana mal olur.',
@@ -311,7 +338,7 @@
                     watchAdBtn: '🎬 Watch Ad (+10 Points)',
                     visitBotBtn: '🎯 Visit Bot (+10 Points)',
                     visitTaskTitle: 'Bot Visit Task',
-                    visitTaskDesc: 'To complete the task, click the link, visit the bot, and return to this page after at least 5 seconds. The task will be canceled if you switch windows.',
+                    visitTaskDesc: 'To complete the task, click the link and visit the bot. To get the reward, you must return to this page after at least 5 seconds. The task will be canceled if you switch windows.',
                     visitBotLink: 'Bot Link',
                     addYourBotTitle: 'Add Your Bot',
                     addYourBotDesc: 'Add your bot\'s referral link for others to visit. This costs 10 points.',
@@ -345,6 +372,7 @@
             let currentLanguage = 'tr';
 
             // --- DOM ELEMENTS ---
+            const connectionStatusEl = document.getElementById('connection-status');
             const usernameEl = document.getElementById('username');
             const pointsEl = document.getElementById('points');
             const addBotInput = document.getElementById('add-bot-input');
@@ -677,6 +705,9 @@
                 currentUser = { id: userId, username: username };
 
                 room.collection('users_v3').subscribe(users => {
+                    connectionStatusEl.classList.add('connected');
+                    connectionStatusEl.title = "Bağlantı kuruldu!";
+
                     allUsers = users.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
                     
                     const userRecord = allUsers.find(u => u.userId === currentUser.id);
