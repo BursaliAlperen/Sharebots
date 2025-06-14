@@ -390,7 +390,10 @@
                 }
 
                 if (!appData.users[userId]) {
-                    appData.users[userId] = { username: userName, points: 100 };
+                    appData.users[userId] = { username: userName, points: 100, visitedBots: [] };
+                } else if (!appData.users[userId].visitedBots) {
+                    // For existing users from old state, ensure visitedBots exists
+                    appData.users[userId].visitedBots = [];
                 }
                 
                 currentUser = {
@@ -464,7 +467,13 @@
                     addBotBtn.textContent = T.addBotBtn;
                 }
 
-                const eligibleBotsForVisit = appData.botLinks.filter(bot => bot.owner !== currentUser.id && appData.users[bot.owner] && appData.users[bot.owner].points >= 10);
+                const visitedBots = appData.users[currentUser.id]?.visitedBots || [];
+                const eligibleBotsForVisit = appData.botLinks.filter(bot => 
+                    bot.owner !== currentUser.id && 
+                    appData.users[bot.owner] && 
+                    appData.users[bot.owner].points >= 10 &&
+                    !visitedBots.includes(bot.url)
+                );
                 visitBotBtn.disabled = eligibleBotsForVisit.length === 0;
 
                 renderBotList();
@@ -514,10 +523,125 @@
                 showToast(T.botAddedSuccess);
             };
 
-            const handleWatchAd = async () => {
+            const handleWatchAd = () => {
                 const T = translations[currentLanguage];
                 watchAdBtn.disabled = true;
                 watchAdBtn.textContent = T.adLoading;
+
+                show_9448585().then(() => {
+                    changePoints(10);
+                    showToast(T.adWatchedSuccess);
+                }).catch((error) => {
+                    showToast(T.adError, 'error');
+                    console.error("Ad error:", error);
+                }).finally(() => {
+                    watchAdBtn.disabled = false;
+                    updateUI();
+                });
+            };
+
+            const resetVisitTask = () => {
+                clearInterval(visitTask.timerId);
+                if (visitTask.visibilityListener) {
+                    document.removeEventListener('visibilitychange', visitTask.visibilityListener);
+                }
+                visitTask = { active: false, timerId: null, timeLeft: 5, visibilityListener: null, chosenBot: null };
+                earnPointsCard.style.display = 'flex';
+                visitTaskCard.style.display = 'none';
+            };
+
+            const startAdSequenceForVisit = () => {
+                const T = translations[currentLanguage];
+                showToast(T.visitTaskTimerDone, 'info');
+
+                show_9448585().then(() => {
+                    // Task is successful, award points
+                    changePoints(10);
+                    
+                    // Deduct points from the bot owner
+                    const owner = appData.users[visitTask.chosenBot.owner];
+                    if (owner) {
+                        owner.points -= 10;
+                    }
+
+                    // Mark this bot as visited for the current user
+                    appData.users[currentUser.id].visitedBots.push(visitTask.chosenBot.url);
+                    
+                    saveState();
+                    showToast(T.visitTaskCompleted);
+
+                }).catch((error) => {
+                    showToast(T.adErrorDuringVisit, 'error');
+                    console.error("Ad error during visit task:", error);
+                }).finally(() => {
+                    resetVisitTask();
+                    updateUI();
+                });
+            };
+            
+            const startVisitTask = (bot) => {
+                const T = translations[currentLanguage];
+                visitTask.active = true;
+                visitTask.chosenBot = bot;
+                visitTask.timeLeft = 5;
+
+                earnPointsCard.style.display = 'none';
+                visitTaskCard.style.display = 'flex';
+                timerEl.textContent = visitTask.timeLeft;
+                visitBotLinkEl.href = bot.url;
+
+                visitTask.visibilityListener = () => {
+                    if (document.visibilityState === 'hidden') {
+                        showToast(T.visitTaskCancelled, 'error');
+                        resetVisitTask();
+                        updateUI();
+                    }
+                };
+                document.addEventListener('visibilitychange', visitTask.visibilityListener);
                 
-                try {
-                  </html>
+                visitTask.timerId = setInterval(() => {
+                    visitTask.timeLeft--;
+                    timerEl.textContent = visitTask.timeLeft;
+                    if (visitTask.timeLeft <= 0) {
+                        clearInterval(visitTask.timerId);
+                        document.removeEventListener('visibilitychange', visitTask.visibilityListener);
+                        visitTask.visibilityListener = null;
+                        startAdSequenceForVisit();
+                    }
+                }, 1000);
+            };
+
+            const handleVisitBot = () => {
+                const T = translations[currentLanguage];
+                const visitedBots = appData.users[currentUser.id].visitedBots || [];
+                const eligibleBots = appData.botLinks.filter(bot => 
+                    bot.owner !== currentUser.id && 
+                    appData.users[bot.owner] && 
+                    appData.users[bot.owner].points >= 10 &&
+                    !visitedBots.includes(bot.url)
+                );
+
+                if (eligibleBots.length === 0) {
+                    showToast(T.noBotsToVisit, 'info');
+                    return;
+                }
+
+                const chosenBot = eligibleBots[Math.floor(Math.random() * eligibleBots.length)];
+                startVisitTask(chosenBot);
+            };
+
+            // --- EVENT LISTENERS ---
+            addBotBtn.addEventListener('click', handleAddBot);
+            watchAdBtn.addEventListener('click', handleWatchAd);
+            visitBotBtn.addEventListener('click', handleVisitBot);
+            langTrBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('tr'); });
+            langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
+
+            // --- INITIALIZATION ---
+            loadState();
+            setLanguage(currentLanguage);
+
+        });
+    </script>
+</body>
+</html>
