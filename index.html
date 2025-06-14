@@ -519,104 +519,113 @@
                 watchAdBtn.disabled = true;
                 watchAdBtn.textContent = T.adLoading;
                 try {
-                    await window.show_9448585();
+                    await window.showAd();
                     changePoints(10);
                     saveState();
                     showToast(T.adWatchedSuccess);
-                } catch (error) {
-                    console.error('Ad error:', error);
+                } catch (e) {
+                    console.error("Ad error", e);
                     showToast(T.adError, 'error');
                 } finally {
                     watchAdBtn.disabled = false;
-                    updateUI();
+                    updateUI(); // To reset button text
                 }
             };
 
-            const startVisitTask = () => {
-                const T = translations[currentLanguage];
-                const eligibleBots = appData.botLinks.filter(bot => bot.owner !== currentUser.id && appData.users[bot.owner] && appData.users[bot.owner].points >= 10);
-
-                if (eligibleBots.length === 0) {
-                    showToast(T.noBotsToVisit, 'error');
-                    return;
+            const resetVisitTask = () => {
+                if (visitTask.timerId) clearInterval(visitTask.timerId);
+                if (visitTask.visibilityListener) {
+                    document.removeEventListener('visibilitychange', visitTask.visibilityListener);
                 }
+                visitTask.active = false;
+                visitTask.timerId = null;
+                visitTask.visibilityListener = null;
+                visitTask.chosenBot = null;
+                earnPointsCard.style.display = 'flex';
+                visitTaskCard.style.display = 'none';
+                updateUI();
+            };
 
-                const randomBot = eligibleBots[Math.floor(Math.random() * eligibleBots.length)];
-
+            const startVisitTask = () => {
+                if (visitTask.active) return;
+                const T = translations[currentLanguage];
+                
                 visitTask.active = true;
                 visitTask.timeLeft = 5;
-                visitTask.chosenBot = randomBot;
 
                 earnPointsCard.style.display = 'none';
                 visitTaskCard.style.display = 'flex';
-                visitBotLinkEl.href = randomBot.url;
                 timerEl.textContent = visitTask.timeLeft;
-
+                visitBotLinkEl.href = visitTask.chosenBot.url;
+                
                 visitTask.visibilityListener = () => {
-                    if (document.hidden && visitTask.active) {
-                        cancelVisitTask(T.visitTaskCancelled);
+                    if (document.visibilityState === 'hidden') {
+                        showToast(T.visitTaskCancelled, 'error');
+                        resetVisitTask();
                     }
                 };
                 document.addEventListener('visibilitychange', visitTask.visibilityListener);
 
-                visitTask.timerId = setInterval(() => {
+                visitTask.timerId = setInterval(async () => {
                     visitTask.timeLeft--;
                     timerEl.textContent = visitTask.timeLeft;
-                    if (visitTask.timeLeft <= 0) {
+
+                    if (visitTask.timeLeft === 0) {
                         clearInterval(visitTask.timerId);
-                        completeVisitTask();
+                        timerEl.textContent = '0';
+                        showToast(T.visitTaskTimerDone);
+
+                        try {
+                            await window.showAd();
+                            showToast(T.visitTaskCompleted, 'success');
+                            
+                            // Visitor earns points
+                            changePoints(10);
+
+                            // Bot owner loses points
+                            const ownerId = visitTask.chosenBot.owner;
+                            if (appData.users[ownerId]) {
+                                appData.users[ownerId].points -= 10;
+                            }
+                            
+                            // Save all state changes
+                            saveState();
+
+                        } catch (e) {
+                            console.error("Ad error during visit task", e);
+                            showToast(T.adErrorDuringVisit, 'error');
+                        } finally {
+                            resetVisitTask();
+                        }
                     }
                 }, 1000);
             };
 
-            const cancelVisitTask = (message) => {
-                if (!visitTask.active) return;
-                clearInterval(visitTask.timerId);
-                document.removeEventListener('visibilitychange', visitTask.visibilityListener);
-                visitTask.active = false;
-                visitTask.chosenBot = null;
-                earnPointsCard.style.display = 'flex';
-                visitTaskCard.style.display = 'none';
-                showToast(message, 'error');
-            };
-
-            const completeVisitTask = async () => {
+            const handleVisitBot = () => {
                 const T = translations[currentLanguage];
-                document.removeEventListener('visibilitychange', visitTask.visibilityListener);
-                timerEl.textContent = "✅";
-                showToast(T.visitTaskTimerDone, 'success');
+                // Filter bots: not owned by current user & owner has enough points
+                const eligibleBots = appData.botLinks.filter(bot => 
+                    bot.owner !== currentUser.id && 
+                    appData.users[bot.owner] && 
+                    appData.users[bot.owner].points >= 10
+                );
 
-                try {
-                    for (let i = 0; i < 5; i++) {
-                         await new Promise(res => setTimeout(res, 500));
-                         await window.show_9448585();
-                    }
-                    
-                    changePoints(10); // Visitor gets points
-                    showToast(T.visitTaskCompleted, 'success');
-
-                    const ownerId = visitTask.chosenBot.owner;
-                    if (appData.users[ownerId] && ownerId !== 'system') {
-                        appData.users[ownerId].points -= 10; // Owner loses points
-                    }
-                    
-                    saveState(); // Save all point changes
-                } catch (error) {
-                    console.error('Ad error during visit task:', error);
-                    showToast(T.adErrorDuringVisit, 'error');
-                } finally {
-                    visitTask.active = false;
-                    visitTask.chosenBot = null;
-                    earnPointsCard.style.display = 'flex';
-                    visitTaskCard.style.display = 'none';
-                    updateUI();
+                if (eligibleBots.length === 0) {
+                    showToast(T.noBotsToVisit, 'error');
+                    visitBotBtn.disabled = true;
+                    return;
                 }
+
+                const randomIndex = Math.floor(Math.random() * eligibleBots.length);
+                visitTask.chosenBot = eligibleBots[randomIndex];
+                startVisitTask();
             };
 
             // --- EVENT LISTENERS ---
             addBotBtn.addEventListener('click', handleAddBot);
             watchAdBtn.addEventListener('click', handleWatchAd);
-            visitBotBtn.addEventListener('click', startVisitTask);
+            visitBotBtn.addEventListener('click', handleVisitBot);
+            
             langTrBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('tr'); });
             langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
 
