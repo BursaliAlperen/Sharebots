@@ -90,6 +90,13 @@
             color: var(--text-color);
         }
 
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
         .card p {
             margin: 0 0 10px 0;
             color: #a0a0a0;
@@ -215,6 +222,37 @@
         .toast.error {
             background-color: var(--error-color);
         }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -237,14 +275,17 @@
 
         <div id="visit-task-card" class="card">
             <h2 data-key="visitTaskTitle">Bot Ziyareti Görevi</h2>
-            <p data-key="visitTaskDesc">Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.</p>
+            <p data-key="visitTaskDesc">Görevi tamamlamak için linke tıklayın ve botu ziyaret edin. Ödülünüzü almak için en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.</p>
             <a id="visit-bot-link" href="#" target="_blank" rel="noopener noreferrer" data-key="visitBotLink">Bot Linki</a>
             <div id="timer">5</div>
             <button id="cancel-visit-btn" class="btn" data-key="cancelBtn" style="margin-top: 10px;">İptal Et</button>
         </div>
 
         <div id="bot-list-card" class="card">
-            <h2 data-key="addedBotsTitle">Eklenen Botlar</h2>
+            <div class="card-header">
+                <h2 data-key="addedBotsTitle" style="margin: 0;">Eklenen Botlar</h2>
+                <button id="refresh-btn" title="Refresh List" class="btn" style="padding: 8px 12px; font-size: 1.1em; line-height: 1;">🔄</button>
+            </div>
             <p data-key="addedBotsDesc">Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.</p>
             <div id="bot-list-container">
                 <!-- Bots will be dynamically inserted here -->
@@ -263,6 +304,10 @@
 
     <div class="lang-switcher">
         <a href="#" id="lang-tr" class="active">TR</a> | <a href="#" id="lang-en">EN</a>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
     </div>
 
     <script>
@@ -284,7 +329,7 @@
                     watchAdBtn: '🎬 Reklam İzle (+10 Puan)',
                     visitBotBtn: '🎯 Bot Ziyaret Et (+10 Puan)',
                     visitTaskTitle: 'Bot Ziyareti Görevi',
-                    visitTaskDesc: 'Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.',
+                    visitTaskDesc: 'Görevi tamamlamak için linke tıklayın ve botu ziyaret edin. Ödülünüzü almak için en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.',
                     visitBotLink: 'Bot Linki',
                     addYourBotTitle: 'Botunu Ekle',
                     addYourBotDesc: 'Botunuzun referans linkini ekleyerek başkalarının ziyaret etmesini sağlayın. Bu işlem 10 puana mal olur.',
@@ -298,7 +343,7 @@
                     botAddedSuccess: 'Bot başarıyla eklendi!',
                     adWatchedSuccess: 'Reklam izlendi! +10 Puan kazandınız.',
                     adError: 'Reklam gösterilemedi. Tekrar deneyin.',
-                    visitTaskFail: 'Çok erken geri döndünüz. Görev başarısız oldu.',
+                    visitTaskFail: 'Çok erken geri döndünüz (en az 5 saniye gerekli). Görev başarısız oldu.',
                     visitTaskSuccess: 'Harika! Şimdi ödülünüz için reklamları izleyin.',
                     visitTaskCompleted: 'Görev tamamlandı! +10 Puan kazandınız.',
                     adErrorDuringVisit: 'Reklam hatası. Puan eklenemedi.',
@@ -308,6 +353,7 @@
                     cancelBtn: 'İptal Et',
                     ownerHasNoPoints: 'Bot sahibinin artık yeterli puanı yok. Puan verilmedi.',
                     syncError: 'Veriler sunucuyla senkronize edilemedi.',
+                    dataRefreshed: 'Veriler yenilendi!',
                 },
                 en: {
                     pointsSuffix: 'Points',
@@ -316,7 +362,7 @@
                     watchAdBtn: '🎬 Watch Ad (+10 Points)',
                     visitBotBtn: '🎯 Visit Bot (+10 Points)',
                     visitTaskTitle: 'Bot Visit Task',
-                    visitTaskDesc: 'To complete the task, click the link, visit the bot, and return to this page after at least 5 seconds. The task will be canceled if you switch windows.',
+                    visitTaskDesc: 'To complete the task, click the link and visit the bot. Return to this page after at least 5 seconds to claim your reward. The task will be canceled if you switch windows.',
                     visitBotLink: 'Bot Link',
                     addYourBotTitle: 'Add Your Bot',
                     addYourBotDesc: 'Add your bot\'s referral link for others to visit. This costs 10 points.',
@@ -330,7 +376,7 @@
                     botAddedSuccess: 'Bot added successfully!',
                     adWatchedSuccess: 'Ad watched! You earned +10 Points.',
                     adError: 'Could not show ad. Please try again.',
-                    visitTaskFail: 'You returned too soon. Task failed.',
+                    visitTaskFail: 'You returned too soon (at least 5 seconds required). Task failed.',
                     visitTaskSuccess: 'Great! Now watch the ads for your reward.',
                     visitTaskCompleted: 'Task complete! You earned +10 Points.',
                     adErrorDuringVisit: 'Ad error. Points could not be added.',
@@ -340,6 +386,7 @@
                     cancelBtn: 'Cancel',
                     ownerHasNoPoints: 'Bot owner no longer has enough points. No points awarded.',
                     syncError: 'Could not sync data with server.',
+                    dataRefreshed: 'Data refreshed!',
                 }
             };
 
@@ -364,6 +411,8 @@
             const langTrBtn = document.getElementById('lang-tr');
             const langEnBtn = document.getElementById('lang-en');
             const cancelVisitBtn = document.getElementById('cancel-visit-btn');
+            const refreshBtn = document.getElementById('refresh-btn');
+            const loadingOverlay = document.getElementById('loading-overlay');
 
             // --- VISIT BOT TASK STATE ---
             let visitTask = {
@@ -373,46 +422,56 @@
             };
 
             // --- FUNCTIONS ---
-            const fetchRemoteState = async () => {
-                try {
-                    const response = await fetch(NPOINT_URL, { cache: "no-cache" });
-                    if (!response.ok) throw new Error(`Network response was not ok, status: ${response.status}`);
-                    const data = await response.json();
-                    if (typeof data !== 'object' || data === null || !data.users || !data.botLinks) {
-                        console.warn("Fetched data is malformed. Initializing default structure.");
-                        return { users: { 'system': { username: 'System', points: 999999 } }, botLinks: [] };
+            const showLoader = () => loadingOverlay.classList.add('show');
+            const hideLoader = () => loadingOverlay.classList.remove('show');
+
+            const fetchRemoteState = async (retries = 3) => {
+                let lastError;
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(NPOINT_URL, { cache: "no-cache" });
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        const data = await response.json();
+                        if (typeof data !== 'object' || data === null || !data.users || !Array.isArray(data.botLinks)) {
+                            throw new Error('Malformed data from server');
+                        }
+                        return data;
+                    } catch (error) {
+                        lastError = error;
+                        console.error(`Fetch attempt ${i + 1} failed:`, error);
+                        if (i < retries - 1) {
+                            await new Promise(res => setTimeout(res, 500 * (i + 1)));
+                        }
                     }
-                    return data;
-                } catch (error) {
-                    console.error("Could not load remote state. Initializing with defaults.", error);
-                    const T = translations[currentLanguage];
-                    if (T && T.syncError) showToast(T.syncError, 'error');
-                    return { 
-                        users: { 'system': { username: 'System', points: 999999 } }, 
-                        botLinks: [
-                            { url: 'https://t.me/SpamBot', owner: 'system', timestamp: Date.now() },
-                            { url: 'https://t.me/Stickers', owner: 'system', timestamp: Date.now() }
-                        ] 
-                    };
                 }
+                console.error("Could not load remote state after all retries:", lastError);
+                throw lastError;
             };
 
-            const saveRemoteState = async (dataToSave) => {
-                try {
-                    const response = await fetch(NPOINT_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(dataToSave),
-                    });
-                    if (!response.ok) throw new Error(`Failed to save remote state, status: ${response.status}`);
-                    appData = dataToSave; // Update local state cache after successful save
-                    return true;
-                } catch (error) {
-                    console.error("Failed to save remote state:", error);
-                    const T = translations[currentLanguage];
-                    showToast(T.syncError, 'error');
-                    return false;
+            const saveRemoteState = async (dataToSave, retries = 3) => {
+                let lastError;
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(NPOINT_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(dataToSave),
+                        });
+                        if (!response.ok) throw new Error(`Failed to save remote state, status: ${response.status}`);
+                        appData = JSON.parse(JSON.stringify(dataToSave)); // Deep copy to update local cache
+                        return true;
+                    } catch (error) {
+                        lastError = error;
+                        console.error(`Save attempt ${i + 1} failed:`, error);
+                        if (i < retries - 1) {
+                            await new Promise(res => setTimeout(res, 500 * (i + 1))); // Wait before retrying
+                        }
+                    }
                 }
+                console.error("Failed to save remote state after all retries:", lastError);
+                const T = translations[currentLanguage];
+                showToast(T.syncError, 'error');
+                return false;
             };
             
             const setLanguage = (lang) => {
@@ -508,51 +567,60 @@
                 const T = translations[currentLanguage];
                 if (addBotBtn.disabled) return;
                 const link = addBotInput.value.trim();
-                
+
                 if (!link.startsWith('https://t.me/')) {
                     showToast(T.invalidBotLink, 'error');
                     return;
                 }
 
+                showLoader();
                 addBotBtn.disabled = true;
 
-                let remoteData = await fetchRemoteState();
-                let user = remoteData.users[currentUser.id];
+                try {
+                    let remoteData = await fetchRemoteState();
+                    let user = remoteData.users[currentUser.id];
 
-                if (!user || user.points < 10) {
-                    showToast(T.notEnoughPointsError, 'error');
-                    updateUI(); // Re-sync UI with fresh data
-                    return;
-                }
+                    if (!user || user.points < 10) {
+                        showToast(T.notEnoughPointsError, 'error');
+                        return; // Finally block will handle UI update
+                    }
 
-                user.points -= 10;
-                remoteData.botLinks.push({ url: link, owner: currentUser.id, timestamp: Date.now() });
-                
-                const success = await saveRemoteState(remoteData);
-                if (success) {
-                    currentUser.points = user.points;
-                    addBotInput.value = '';
-                    showToast(T.botAddedSuccess);
+                    user.points -= 10;
+                    remoteData.botLinks.push({ url: link, owner: currentUser.id, timestamp: Date.now() });
+
+                    const success = await saveRemoteState(remoteData);
+                    if (success) {
+                        currentUser.points = user.points;
+                        addBotInput.value = '';
+                        showToast(T.botAddedSuccess);
+                    }
+                } catch (error) {
+                    console.error("handleAddBot error:", error);
+                    showToast(T.syncError, 'error');
+                } finally {
+                    hideLoader();
+                    updateUI();
                 }
-                
-                updateUI();
             };
 
             const handleWatchAd = async () => {
                 const T = translations[currentLanguage];
+                showLoader();
                 watchAdBtn.disabled = true;
                 visitBotBtn.disabled = true;
-                watchAdBtn.textContent = T.adLoading;
 
                 try {
+                    if (typeof show_9448585 !== 'function') {
+                        throw new Error('Ad SDK not available.');
+                    }
                     await show_9448585();
-                    
+
                     let remoteData = await fetchRemoteState();
                     if (!remoteData.users[currentUser.id]) {
                         remoteData.users[currentUser.id] = { username: currentUser.username, points: 0, visitedBots: [] };
                     }
                     remoteData.users[currentUser.id].points += 10;
-                    
+
                     const success = await saveRemoteState(remoteData);
 
                     if (success) {
@@ -560,11 +628,18 @@
                         showToast(T.adWatchedSuccess);
                     }
                 } catch (error) {
-                    showToast(T.adError, 'error');
-                    console.error("Ad error:", error);
+                    // This catch block handles both ad error and sync error
+                    const errorMessage = (error && typeof error === 'string') ? error : (error && error.message) ? error.message : 'Unknown Error';
+
+                    if (errorMessage.toLowerCase().includes('ad')) { // Heuristic to check if it's an ad error
+                        showToast(T.adError, 'error');
+                    } else {
+                        showToast(T.syncError, 'error');
+                    }
+                    console.error("Ad/Sync error:", error);
                 } finally {
+                    hideLoader();
                     updateUI();
-                    watchAdBtn.disabled = false;
                 }
             };
 
@@ -581,8 +656,12 @@
             const handleVisitFail = async () => {
                 const T = translations[currentLanguage];
                 showToast(T.visitTaskFail, 'error');
+                showLoader();
 
                 try {
+                    if (typeof show_9448585 !== 'function') {
+                        throw new Error('Ad SDK not available.');
+                    }
                     for (let i = 0; i < 4; i++) {
                         await show_9448585();
                     }
@@ -590,6 +669,7 @@
                     console.error('Ad error during visit task (fail case):', error);
                     showToast(T.adErrorDuringVisit, 'error');
                 } finally {
+                    hideLoader();
                     resetVisitTask();
                     updateUI();
                 }
@@ -598,61 +678,83 @@
             const handleVisitSuccess = async () => {
                 const T = translations[currentLanguage];
                 showToast(T.visitTaskSuccess, 'info');
+                showLoader();
 
                 try {
-                    for (let i = 0; i < 4; i++) {
-                        await show_9448585();
+                    // First, show the ads. If they fail, stop the whole process.
+                    try {
+                        if (typeof show_9448585 !== 'function') {
+                            throw new Error('Ad SDK not available.');
+                        }
+                        for (let i = 0; i < 4; i++) {
+                            await show_9448585();
+                        }
+                    } catch (error) {
+                        console.error('Ad error during visit task:', error);
+                        showToast(T.adErrorDuringVisit, 'error');
+                        return; // Stop execution if ads fail
+                    }
+
+                    // Ads were successful, now update points.
+                    let remoteData = await fetchRemoteState();
+                    let visitor = remoteData.users[currentUser.id];
+                    let owner = remoteData.users[visitTask.chosenBot.owner];
+
+                    if (!owner || owner.points < 10) {
+                        showToast(T.ownerHasNoPoints, 'error');
+                    } else {
+                        // Safeguard in case the visitor is somehow not in the user list
+                        if (!visitor) {
+                            remoteData.users[currentUser.id] = { username: currentUser.username, points: 0, visitedBots: [] };
+                            visitor = remoteData.users[currentUser.id];
+                        }
+                        visitor.points += 10;
+                        owner.points -= 10;
+                        if (!visitor.visitedBots) {
+                            visitor.visitedBots = [];
+                        }
+                        visitor.visitedBots.push(visitTask.chosenBot.url);
+
+                        const success = await saveRemoteState(remoteData);
+                        if (success) {
+                            currentUser.points = visitor.points;
+                            showToast(T.visitTaskCompleted);
+                        }
                     }
                 } catch (error) {
-                    console.error('Ad error during visit task:', error);
-                    showToast(T.adErrorDuringVisit, 'error');
+                    console.error("handleVisitSuccess sync error:", error);
+                    showToast(T.syncError, 'error');
+                } finally {
+                    hideLoader();
                     resetVisitTask();
                     updateUI();
-                    return;
                 }
-
-                let remoteData = await fetchRemoteState();
-                let visitor = remoteData.users[currentUser.id];
-                let owner = remoteData.users[visitTask.chosenBot.owner];
-
-                if (!owner || owner.points < 10) {
-                    showToast(T.ownerHasNoPoints, 'error');
-                } else {
-                    visitor.points += 10;
-                    owner.points -= 10;
-                    if (!visitor.visitedBots) {
-                        visitor.visitedBots = [];
-                    }
-                    visitor.visitedBots.push(visitTask.chosenBot.url);
-
-                    const success = await saveRemoteState(remoteData);
-                    if (success) {
-                        currentUser.points = visitor.points;
-                        showToast(T.visitTaskCompleted);
-                    }
-                }
-                
-                resetVisitTask();
-                updateUI();
             };
 
             const handleVisibilityChangeForVisit = () => {
                 if (!visitTask.active) return;
 
-                if (document.visibilityState === 'hidden' && visitTask.startTime === 0) {
-                    // User has left the page after clicking the link
-                    visitTask.startTime = Date.now();
-                } else if (document.visibilityState === 'visible' && visitTask.startTime > 0) {
-                    // User has returned
-                    const elapsed = Date.now() - visitTask.startTime;
-                    
+                if (document.visibilityState === 'visible' && visitTask.startTime > 0) {
+                    // User has returned. Unregister listener immediately.
                     document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
                     
-                    if (elapsed >= 5000) {
-                        handleVisitSuccess();
-                    } else {
-                        handleVisitFail();
-                    }
+                    const elapsed = Date.now() - visitTask.startTime;
+                    visitTask.startTime = 0; // Prevent re-triggering
+                    
+                    showLoader(); // Show feedback that something is happening
+
+                    // Use a short timeout to let the loader appear before potentially blocking work (ads)
+                    setTimeout(() => {
+                        if (elapsed >= 5000) {
+                            handleVisitSuccess();
+                        } else {
+                            handleVisitFail();
+                        }
+                    }, 50);
+
+                } else if (document.visibilityState === 'hidden' && visitTask.startTime === 0) {
+                    // User has left the page after clicking the link
+                    visitTask.startTime = Date.now();
                 }
             };
             
@@ -693,10 +795,66 @@
                 startVisitTask(chosenBot);
             };
 
+            const handleRefresh = async () => {
+                const T = translations[currentLanguage];
+                showLoader();
+                refreshBtn.disabled = true;
+
+                try {
+                    const newData = await fetchRemoteState();
+                    appData = newData; // Update global state
+
+                    const user = appData.users[currentUser.id];
+                    if (user) {
+                        currentUser.points = user.points;
+                    } else {
+                        // This case is unlikely if app initialized correctly, but as a safeguard:
+                        currentUser.points = 0;
+                    }
+
+                    updateUI();
+                    showToast(T.dataRefreshed, 'success');
+                } catch (e) {
+                    console.error('Refresh failed', e);
+                    showToast(T.syncError, 'error');
+                } finally {
+                    hideLoader();
+                    refreshBtn.disabled = false;
+                }
+            };
+
             const initializeApp = async () => {
+                showLoader();
                 currentLanguage = localStorage.getItem('botPointsLang') || 'tr';
-                
-                appData = await fetchRemoteState();
+
+                try {
+                    appData = await fetchRemoteState();
+                } catch (error) {
+                    const T = translations[currentLanguage];
+                    console.error("Fatal: Could not initialize app state from server. App is disabled.", error);
+                    showToast(T.syncError, 'error');
+
+                    document.querySelectorAll('button, input, a').forEach(el => {
+                        if (el.id !== 'lang-tr' && el.id !== 'lang-en') {
+                            el.style.pointerEvents = 'none';
+                            el.style.opacity = '0.6';
+                        }
+                        if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') {
+                            el.disabled = true;
+                        }
+                    });
+
+                    const earnCard = document.getElementById('earn-points-card');
+                    const errorMsg = currentLanguage === 'tr' ? 'Uygulama başlatılamadı. Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin.' : 'Application could not start. Please check your internet connection and refresh the page.';
+                    if (earnCard) {
+                        earnCard.innerHTML = `<h2 style="color: var(--error-color);">${T.syncError}</h2><p>${errorMsg}</p>`;
+                    }
+
+                    langTrBtn.classList.toggle('active', currentLanguage === 'tr');
+                    langEnBtn.classList.toggle('active', currentLanguage === 'en');
+                    hideLoader();
+                    return; // Halt execution
+                }
 
                 // Prune old bots
                 const fourHours = 4 * 60 * 60 * 1000;
@@ -724,12 +882,24 @@
 
                 // If user doesn't exist in remote data, create them
                 if (!appData.users[userId]) {
-                    appData.users[userId] = { username: userName, points: 100, visitedBots: [] };
+                    appData.users[userId] = { username: userName, points: 10, visitedBots: [] };
                     needsSave = true;
                 }
                 
                 if (needsSave) {
-                    await saveRemoteState(appData);
+                    const saved = await saveRemoteState(appData);
+                    if (!saved) {
+                        const T = translations[currentLanguage];
+                        showToast(T.syncError, 'error');
+                        document.querySelectorAll('button, input').forEach(el => el.disabled = true);
+                        const earnCard = document.getElementById('earn-points-card');
+                        if (earnCard) {
+                            const errorMsg = currentLanguage === 'tr' ? 'İlk kurulum başarısız oldu. Lütfen sayfayı yenileyin.' : 'Initial setup failed. Please refresh the page.';
+                            earnCard.innerHTML = `<h2 style="color: var(--error-color);">${T.syncError}</h2><p>${errorMsg}</p>`;
+                        }
+                        hideLoader();
+                        return;
+                    }
                 }
 
                 const user = appData.users[userId];
@@ -740,12 +910,14 @@
                 };
 
                 setLanguage(currentLanguage);
+                hideLoader();
             };
 
             // --- EVENT LISTENERS ---
             addBotBtn.addEventListener('click', handleAddBot);
             watchAdBtn.addEventListener('click', handleWatchAd);
             visitBotBtn.addEventListener('click', handleVisitBot);
+            refreshBtn.addEventListener('click', handleRefresh);
             cancelVisitBtn.addEventListener('click', () => {
                 resetVisitTask();
                 updateUI();
