@@ -237,9 +237,10 @@
 
         <div id="visit-task-card" class="card">
             <h2 data-key="visitTaskTitle">Bot Ziyareti Görevi</h2>
-            <p data-key="visitTaskDesc">Görevi tamamlamak için 5 saniye boyunca bu pencerede kalın. Pencereden ayrılırsanız görev iptal olur.</p>
+            <p data-key="visitTaskDesc">Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.</p>
             <a id="visit-bot-link" href="#" target="_blank" rel="noopener noreferrer" data-key="visitBotLink">Bot Linki</a>
             <div id="timer">5</div>
+            <button id="cancel-visit-btn" class="btn" data-key="cancelBtn" style="margin-top: 10px;">İptal Et</button>
         </div>
 
         <div id="bot-list-card" class="card" style="display: none;">
@@ -283,7 +284,7 @@
                     watchAdBtn: '🎬 Reklam İzle (+10 Puan)',
                     visitBotBtn: '🎯 Bot Ziyaret Et (+10 Puan)',
                     visitTaskTitle: 'Bot Ziyareti Görevi',
-                    visitTaskDesc: 'Görevi tamamlamak için 5 saniye boyunca bu pencerede kalın. Pencereden ayrılırsanız görev iptal olur.',
+                    visitTaskDesc: 'Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.',
                     visitBotLink: 'Bot Linki',
                     addYourBotTitle: 'Botunu Ekle',
                     addYourBotDesc: 'Botunuzun referans linkini ekleyerek başkalarının ziyaret etmesini sağlayın. Bu işlem 10 puana mal olur.',
@@ -297,13 +298,14 @@
                     botAddedSuccess: 'Bot başarıyla eklendi!',
                     adWatchedSuccess: 'Reklam izlendi! +10 Puan kazandınız.',
                     adError: 'Reklam gösterilemedi. Tekrar deneyin.',
-                    visitTaskCancelled: 'Pencere değiştirildiği için görev iptal edildi.',
-                    visitTaskTimerDone: 'Süre doldu! Reklamlar gösteriliyor...',
+                    visitTaskFail: 'Çok erken geri döndünüz. Görev başarısız oldu.',
+                    visitTaskSuccess: 'Harika! Şimdi ödülünüz için reklamları izleyin.',
                     visitTaskCompleted: 'Görev tamamlandı! +10 Puan kazandınız.',
                     adErrorDuringVisit: 'Reklam hatası. Puan eklenemedi.',
                     addedBotsTitle: 'Eklenen Botlar',
                     addedBotsDesc: 'Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.',
                     noBotsAvailable: 'Gösterilecek uygun bot yok.',
+                    cancelBtn: 'İptal Et',
                 },
                 en: {
                     pointsSuffix: 'Points',
@@ -312,7 +314,7 @@
                     watchAdBtn: '🎬 Watch Ad (+10 Points)',
                     visitBotBtn: '🎯 Visit Bot (+10 Points)',
                     visitTaskTitle: 'Bot Visit Task',
-                    visitTaskDesc: 'Stay on this window for 5 seconds to complete the task. The task will be canceled if you switch windows.',
+                    visitTaskDesc: 'To complete the task, click the link, visit the bot, and return to this page after at least 5 seconds. The task will be canceled if you switch windows.',
                     visitBotLink: 'Bot Link',
                     addYourBotTitle: 'Add Your Bot',
                     addYourBotDesc: 'Add your bot\'s referral link for others to visit. This costs 10 points.',
@@ -326,13 +328,14 @@
                     botAddedSuccess: 'Bot added successfully!',
                     adWatchedSuccess: 'Ad watched! You earned +10 Points.',
                     adError: 'Could not show ad. Please try again.',
-                    visitTaskCancelled: 'Task canceled because you switched windows.',
-                    visitTaskTimerDone: 'Time is up! Showing ads...',
+                    visitTaskFail: 'You returned too soon. Task failed.',
+                    visitTaskSuccess: 'Great! Now watch the ads for your reward.',
                     visitTaskCompleted: 'Task complete! You earned +10 Points.',
                     adErrorDuringVisit: 'Ad error. Points could not be added.',
                     addedBotsTitle: 'Added Bots',
                     addedBotsDesc: 'Only bots whose owners have enough points (>=10) are listed here.',
                     noBotsAvailable: 'No eligible bots to display.',
+                    cancelBtn: 'Cancel',
                 }
             };
 
@@ -355,14 +358,13 @@
             const botListContainer = document.getElementById('bot-list-container');
             const langTrBtn = document.getElementById('lang-tr');
             const langEnBtn = document.getElementById('lang-en');
+            const cancelVisitBtn = document.getElementById('cancel-visit-btn');
 
             // --- VISIT BOT TASK STATE ---
             let visitTask = {
                 active: false,
-                timerId: null,
-                timeLeft: 5,
-                visibilityListener: null,
-                chosenBot: null
+                startTime: 0,
+                chosenBot: null,
             };
 
             // --- FUNCTIONS ---
@@ -530,6 +532,7 @@
 
                 show_9448585().then(() => {
                     changePoints(10);
+                    saveState();
                     showToast(T.adWatchedSuccess);
                 }).catch((error) => {
                     showToast(T.adError, 'error');
@@ -541,74 +544,98 @@
             };
 
             const resetVisitTask = () => {
-                clearInterval(visitTask.timerId);
-                if (visitTask.visibilityListener) {
-                    document.removeEventListener('visibilitychange', visitTask.visibilityListener);
-                }
-                visitTask = { active: false, timerId: null, timeLeft: 5, visibilityListener: null, chosenBot: null };
+                document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
+                visitTask.active = false;
+                visitTask.chosenBot = null;
+                visitTask.startTime = 0;
+                
                 earnPointsCard.style.display = 'flex';
                 visitTaskCard.style.display = 'none';
+                timerEl.style.display = 'block';
             };
 
-            const startAdSequenceForVisit = () => {
+            const handleVisitFail = async () => {
                 const T = translations[currentLanguage];
-                showToast(T.visitTaskTimerDone, 'info');
+                showToast(T.visitTaskFail, 'error');
 
-                show_9448585().then(() => {
-                    // Task is successful, award points
+                try {
+                    for (let i = 0; i < 4; i++) {
+                        await show_9448585();
+                    }
+                } catch (error) {
+                    console.error('Ad error during visit task (fail case):', error);
+                    showToast(T.adErrorDuringVisit, 'error');
+                } finally {
+                    resetVisitTask();
+                    updateUI();
+                }
+            };
+
+            const handleVisitSuccess = async () => {
+                const T = translations[currentLanguage];
+                showToast(T.visitTaskSuccess, 'info');
+
+                try {
+                    for (let i = 0; i < 4; i++) {
+                        await show_9448585();
+                    }
+
+                    // If all ads were shown successfully:
                     changePoints(10);
-                    
-                    // Deduct points from the bot owner
                     const owner = appData.users[visitTask.chosenBot.owner];
                     if (owner) {
                         owner.points -= 10;
                     }
-
-                    // Mark this bot as visited for the current user
+                    if (!appData.users[currentUser.id].visitedBots) {
+                        appData.users[currentUser.id].visitedBots = [];
+                    }
                     appData.users[currentUser.id].visitedBots.push(visitTask.chosenBot.url);
-                    
                     saveState();
                     showToast(T.visitTaskCompleted);
 
-                }).catch((error) => {
+                } catch (error) {
+                    console.error('Ad error during visit task:', error);
                     showToast(T.adErrorDuringVisit, 'error');
-                    console.error("Ad error during visit task:", error);
-                }).finally(() => {
+                } finally {
                     resetVisitTask();
                     updateUI();
-                });
+                }
+            };
+
+            const handleVisibilityChangeForVisit = () => {
+                if (!visitTask.active) return;
+
+                if (document.visibilityState === 'hidden' && visitTask.startTime === 0) {
+                    // User has left the page after clicking the link
+                    visitTask.startTime = Date.now();
+                } else if (document.visibilityState === 'visible' && visitTask.startTime > 0) {
+                    // User has returned
+                    const elapsed = Date.now() - visitTask.startTime;
+                    
+                    document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
+                    
+                    if (elapsed >= 5000) {
+                        handleVisitSuccess();
+                    } else {
+                        handleVisitFail();
+                    }
+                }
             };
             
             const startVisitTask = (bot) => {
-                const T = translations[currentLanguage];
                 visitTask.active = true;
                 visitTask.chosenBot = bot;
-                visitTask.timeLeft = 5;
+                visitTask.startTime = 0;
 
                 earnPointsCard.style.display = 'none';
                 visitTaskCard.style.display = 'flex';
-                timerEl.textContent = visitTask.timeLeft;
+                timerEl.style.display = 'none'; // Hide the timer element as it's not used in this flow
                 visitBotLinkEl.href = bot.url;
 
-                visitTask.visibilityListener = () => {
-                    if (document.visibilityState === 'hidden') {
-                        showToast(T.visitTaskCancelled, 'error');
-                        resetVisitTask();
-                        updateUI();
-                    }
-                };
-                document.addEventListener('visibilitychange', visitTask.visibilityListener);
-                
-                visitTask.timerId = setInterval(() => {
-                    visitTask.timeLeft--;
-                    timerEl.textContent = visitTask.timeLeft;
-                    if (visitTask.timeLeft <= 0) {
-                        clearInterval(visitTask.timerId);
-                        document.removeEventListener('visibilitychange', visitTask.visibilityListener);
-                        visitTask.visibilityListener = null;
-                        startAdSequenceForVisit();
-                    }
-                }, 1000);
+                // Add the visibility listener only after the user clicks the link
+                visitBotLinkEl.addEventListener('click', () => {
+                    document.addEventListener('visibilitychange', handleVisibilityChangeForVisit);
+                }, { once: true });
             };
 
             const handleVisitBot = () => {
@@ -634,6 +661,10 @@
             addBotBtn.addEventListener('click', handleAddBot);
             watchAdBtn.addEventListener('click', handleWatchAd);
             visitBotBtn.addEventListener('click', handleVisitBot);
+            cancelVisitBtn.addEventListener('click', () => {
+                resetVisitTask();
+                updateUI();
+            });
             langTrBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('tr'); });
             langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
 
