@@ -25,28 +25,6 @@
             padding: 15px;
             overscroll-behavior-y: contain;
             -webkit-font-smoothing: antialiased;
-            <!-- Mevcut HTML içeriği -->
-
-<!-- En sona şu scripti ekle -->
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const watchAdBtn = document.getElementById('watch-ad-btn');
-
-    watchAdBtn.addEventListener('click', () => {
-      watchAdBtn.disabled = true;
-      show_9448585().then(() => {
-        alert('You have seen an ad!');
-        watchAdBtn.disabled = false;
-      }).catch(() => {
-        alert('Ad could not be shown. Please try again.');
-        watchAdBtn.disabled = false;
-      });
-    });
-  });
-</script>
-
-</body>
-</html>
         }
 
         .app-container {
@@ -239,7 +217,6 @@
         }
     </style>
 </head>
-    <script src='//libtl.com/sdk.js' data-zone='9448585' data-sdk='show_9448585'></script>
 <body>
     <div class="app-container">
         <div class="header">
