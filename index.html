@@ -277,6 +277,11 @@
         </div>
     </div>
 
+    <div id="telegram-error" class="card" style="display: none; text-align: center; background-color: var(--error-color); margin: 20px auto; max-width: 600px;">
+        <h2 data-key="telegramErrorTitle" style="color: white;">Erişim Hatası</h2>
+        <p data-key="telegramErrorDesc" style="color: #f0f0f0;">Bu uygulama yalnızca Telegram uygulaması içinden başlatıldığında düzgün çalışır.</p>
+    </div>
+
     <div class="lang-switcher">
         <a href="#" id="lang-tr" class="active">TR</a> | <a href="#" id="lang-en">EN</a>
     </div>
@@ -330,6 +335,8 @@
                     addedBotsDesc: 'Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.',
                     noBotsAvailable: 'Gösterilecek uygun bot yok.',
                     cancelBtn: 'İptal Et',
+                    telegramErrorTitle: 'Erişim Hatası',
+                    telegramErrorDesc: 'Bu uygulama yalnızca Telegram uygulaması içinden başlatıldığında düzgün çalışır.',
                 },
                 en: {
                     pointsSuffix: 'Points',
@@ -361,6 +368,8 @@
                     addedBotsDesc: 'Only bots whose owners have enough points (>=10) are listed here.',
                     noBotsAvailable: 'No eligible bots to display.',
                     cancelBtn: 'Cancel',
+                    telegramErrorTitle: 'Access Error',
+                    telegramErrorDesc: 'This application only works correctly when launched from within the Telegram app.',
                 }
             };
 
@@ -387,6 +396,7 @@
             const langTrBtn = document.getElementById('lang-tr');
             const langEnBtn = document.getElementById('lang-en');
             const cancelVisitBtn = document.getElementById('cancel-visit-btn');
+            const telegramErrorEl = document.getElementById('telegram-error');
 
             // --- VISIT BOT TASK STATE ---
             let visitTask = {
@@ -664,7 +674,7 @@
             const initialize = async () => {
                 const T = translations[currentLanguage];
                 let userId = null;
-                let username = T.guest;
+                let username = null;
                 const tg = window.Telegram.WebApp;
 
                 try {
@@ -676,30 +686,16 @@
                         console.log('Using Telegram user:', username, userId);
                     }
                 } catch (e) {
-                    console.warn("Telegram WebApp not available. Trying other methods.");
+                    console.warn("Telegram WebApp not available. This is expected outside of Telegram.");
                 }
 
                 if (!userId) {
-                    try {
-                        const websimUser = await window.websim.getCurrentUser();
-                        if (websimUser && websimUser.id) {
-                            userId = websimUser.id;
-                            username = websimUser.username;
-                            console.log('Using Websim user:', username, userId);
-                        }
-                    } catch (e) {
-                        console.warn("Could not get Websim user. Falling back to guest mode.");
-                    }
-                }
-                
-                if (!userId) {
-                    userId = localStorage.getItem('botPointsGuestId');
-                    if (!userId) {
-                        userId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-                        localStorage.setItem('botPointsGuestId', userId);
-                    }
-                    username = T.guest;
-                    console.log('Using Guest user:', userId);
+                    console.error("Could not get Telegram user data. App will not function.");
+                    document.querySelector('.app-container').style.display = 'none';
+                    telegramErrorEl.style.display = 'block';
+                    const savedLang = localStorage.getItem('botPointsLang') || 'tr';
+                    setLanguage(savedLang); // To translate the error message
+                    return;
                 }
                 
                 currentUser = { id: userId, username: username };
