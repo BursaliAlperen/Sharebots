@@ -266,7 +266,7 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const tg = window.Telegram.WebApp;
             try {
                 tg.ready();
@@ -306,6 +306,8 @@
                     addedBotsDesc: 'Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.',
                     noBotsAvailable: 'Gösterilecek uygun bot yok.',
                     cancelBtn: 'İptal Et',
+                    ownerHasNoPoints: 'Bot sahibinin artık yeterli puanı yok. Puan verilmedi.',
+                    syncError: 'Veriler sunucuyla senkronize edilemedi.',
                 },
                 en: {
                     pointsSuffix: 'Points',
@@ -336,13 +338,16 @@
                     addedBotsDesc: 'Only bots whose owners have enough points (>=10) are listed here.',
                     noBotsAvailable: 'No eligible bots to display.',
                     cancelBtn: 'Cancel',
+                    ownerHasNoPoints: 'Bot owner no longer has enough points. No points awarded.',
+                    syncError: 'Could not sync data with server.',
                 }
             };
 
             // --- STATE ---
-            let appData = {}; // Holds { users: {}, botLinks: [] }
+            let appData = { users: {}, botLinks: [] };
             let currentUser = { id: 'guest', username: 'Guest', points: 0 };
             let currentLanguage = 'tr';
+            const NPOINT_URL = 'https://api.npoint.io/4a9e5b6a782b404c0a87'; // Shared APP DATA storage
 
             // --- DOM ELEMENTS ---
             const usernameEl = document.getElementById('username');
@@ -368,52 +373,48 @@
             };
 
             // --- FUNCTIONS ---
-            const loadState = () => {
-                currentLanguage = localStorage.getItem('botPointsLang') || 'tr';
-
-                const savedData = JSON.parse(localStorage.getItem('botPointsAppData'));
-                if (savedData && savedData.users) {
-                    appData = savedData;
-                } else {
-                    appData = {
-                        users: { 'system': { username: 'System', points: 999999 } },
+            const fetchRemoteState = async () => {
+                try {
+                    const response = await fetch(NPOINT_URL, { cache: "no-cache" });
+                    if (!response.ok) throw new Error(`Network response was not ok, status: ${response.status}`);
+                    const data = await response.json();
+                    if (typeof data !== 'object' || data === null || !data.users || !data.botLinks) {
+                        console.warn("Fetched data is malformed. Initializing default structure.");
+                        return { users: { 'system': { username: 'System', points: 999999 } }, botLinks: [] };
+                    }
+                    return data;
+                } catch (error) {
+                    console.error("Could not load remote state. Initializing with defaults.", error);
+                    const T = translations[currentLanguage];
+                    if (T && T.syncError) showToast(T.syncError, 'error');
+                    return { 
+                        users: { 'system': { username: 'System', points: 999999 } }, 
                         botLinks: [
-                            { url: 'https://t.me/SpamBot', owner: 'system' },
-                            { url: 'https://t.me/Stickers', owner: 'system' }
-                        ]
+                            { url: 'https://t.me/SpamBot', owner: 'system', timestamp: Date.now() },
+                            { url: 'https://t.me/Stickers', owner: 'system', timestamp: Date.now() }
+                        ] 
                     };
                 }
-
-                let userId = 'guest';
-                let userName = translations[currentLanguage].guest;
-                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                    userId = tg.initDataUnsafe.user.id.toString();
-                    userName = tg.initDataUnsafe.user.first_name || tg.initDataUnsafe.user.username || 'User';
-                }
-
-                if (!appData.users[userId]) {
-                    appData.users[userId] = { username: userName, points: 100, visitedBots: [] };
-                } else if (!appData.users[userId].visitedBots) {
-                    // For existing users from old state, ensure visitedBots exists
-                    appData.users[userId].visitedBots = [];
-                }
-                
-                currentUser = {
-                    id: userId,
-                    username: appData.users[userId].username,
-                    points: appData.users[userId].points
-                };
-
-                saveState();
             };
 
-            const saveState = () => {
-                if (appData.users[currentUser.id]) {
-                    appData.users[currentUser.id].points = currentUser.points;
+            const saveRemoteState = async (dataToSave) => {
+                try {
+                    const response = await fetch(NPOINT_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dataToSave),
+                    });
+                    if (!response.ok) throw new Error(`Failed to save remote state, status: ${response.status}`);
+                    appData = dataToSave; // Update local state cache after successful save
+                    return true;
+                } catch (error) {
+                    console.error("Failed to save remote state:", error);
+                    const T = translations[currentLanguage];
+                    showToast(T.syncError, 'error');
+                    return false;
                 }
-                localStorage.setItem('botPointsAppData', JSON.stringify(appData));
             };
-
+            
             const setLanguage = (lang) => {
                 currentLanguage = lang;
                 localStorage.setItem('botPointsLang', lang);
@@ -503,44 +504,68 @@
                 updateUI();
             };
 
-            const handleAddBot = () => {
+            const handleAddBot = async () => {
                 const T = translations[currentLanguage];
                 if (addBotBtn.disabled) return;
                 const link = addBotInput.value.trim();
+                
                 if (!link.startsWith('https://t.me/')) {
                     showToast(T.invalidBotLink, 'error');
                     return;
                 }
 
-                if (currentUser.points < 10) {
+                addBotBtn.disabled = true;
+
+                let remoteData = await fetchRemoteState();
+                let user = remoteData.users[currentUser.id];
+
+                if (!user || user.points < 10) {
                     showToast(T.notEnoughPointsError, 'error');
+                    updateUI(); // Re-sync UI with fresh data
                     return;
                 }
 
-                changePoints(-10);
-                appData.botLinks.push({ url: link, owner: currentUser.id });
-                saveState();
+                user.points -= 10;
+                remoteData.botLinks.push({ url: link, owner: currentUser.id, timestamp: Date.now() });
+                
+                const success = await saveRemoteState(remoteData);
+                if (success) {
+                    currentUser.points = user.points;
+                    addBotInput.value = '';
+                    showToast(T.botAddedSuccess);
+                }
+                
                 updateUI();
-                addBotInput.value = '';
-                showToast(T.botAddedSuccess);
             };
 
-            const handleWatchAd = () => {
+            const handleWatchAd = async () => {
                 const T = translations[currentLanguage];
                 watchAdBtn.disabled = true;
+                visitBotBtn.disabled = true;
                 watchAdBtn.textContent = T.adLoading;
 
-                show_9448585().then(() => {
-                    changePoints(10);
-                    saveState();
-                    showToast(T.adWatchedSuccess);
-                }).catch((error) => {
+                try {
+                    await show_9448585();
+                    
+                    let remoteData = await fetchRemoteState();
+                    if (!remoteData.users[currentUser.id]) {
+                        remoteData.users[currentUser.id] = { username: currentUser.username, points: 0, visitedBots: [] };
+                    }
+                    remoteData.users[currentUser.id].points += 10;
+                    
+                    const success = await saveRemoteState(remoteData);
+
+                    if (success) {
+                        currentUser.points = remoteData.users[currentUser.id].points;
+                        showToast(T.adWatchedSuccess);
+                    }
+                } catch (error) {
                     showToast(T.adError, 'error');
                     console.error("Ad error:", error);
-                }).finally(() => {
-                    watchAdBtn.disabled = false;
+                } finally {
                     updateUI();
-                });
+                    watchAdBtn.disabled = false;
+                }
             };
 
             const resetVisitTask = () => {
@@ -551,7 +576,6 @@
                 
                 earnPointsCard.style.display = 'flex';
                 visitTaskCard.style.display = 'none';
-                timerEl.style.display = 'block';
             };
 
             const handleVisitFail = async () => {
@@ -579,27 +603,37 @@
                     for (let i = 0; i < 4; i++) {
                         await show_9448585();
                     }
-
-                    // If all ads were shown successfully:
-                    changePoints(10);
-                    const owner = appData.users[visitTask.chosenBot.owner];
-                    if (owner) {
-                        owner.points -= 10;
-                    }
-                    if (!appData.users[currentUser.id].visitedBots) {
-                        appData.users[currentUser.id].visitedBots = [];
-                    }
-                    appData.users[currentUser.id].visitedBots.push(visitTask.chosenBot.url);
-                    saveState();
-                    showToast(T.visitTaskCompleted);
-
                 } catch (error) {
                     console.error('Ad error during visit task:', error);
                     showToast(T.adErrorDuringVisit, 'error');
-                } finally {
                     resetVisitTask();
                     updateUI();
+                    return;
                 }
+
+                let remoteData = await fetchRemoteState();
+                let visitor = remoteData.users[currentUser.id];
+                let owner = remoteData.users[visitTask.chosenBot.owner];
+
+                if (!owner || owner.points < 10) {
+                    showToast(T.ownerHasNoPoints, 'error');
+                } else {
+                    visitor.points += 10;
+                    owner.points -= 10;
+                    if (!visitor.visitedBots) {
+                        visitor.visitedBots = [];
+                    }
+                    visitor.visitedBots.push(visitTask.chosenBot.url);
+
+                    const success = await saveRemoteState(remoteData);
+                    if (success) {
+                        currentUser.points = visitor.points;
+                        showToast(T.visitTaskCompleted);
+                    }
+                }
+                
+                resetVisitTask();
+                updateUI();
             };
 
             const handleVisibilityChangeForVisit = () => {
@@ -640,7 +674,9 @@
 
             const handleVisitBot = () => {
                 const T = translations[currentLanguage];
-                const visitedBots = appData.users[currentUser.id].visitedBots || [];
+                const user = appData.users[currentUser.id];
+                const visitedBots = user ? user.visitedBots : [];
+
                 const eligibleBots = appData.botLinks.filter(bot => 
                     bot.owner !== currentUser.id && 
                     appData.users[bot.owner] && 
@@ -657,6 +693,55 @@
                 startVisitTask(chosenBot);
             };
 
+            const initializeApp = async () => {
+                currentLanguage = localStorage.getItem('botPointsLang') || 'tr';
+                
+                appData = await fetchRemoteState();
+
+                // Prune old bots
+                const fourHours = 4 * 60 * 60 * 1000;
+                const now = Date.now();
+                const originalLength = appData.botLinks.length;
+                
+                const filteredBotLinks = appData.botLinks.filter(bot => 
+                    bot.owner === 'system' || (bot.timestamp && (now - bot.timestamp < fourHours))
+                );
+                
+                let needsSave = false;
+                if (filteredBotLinks.length < originalLength) {
+                    console.log(`Pruned ${originalLength - filteredBotLinks.length} old bots.`);
+                    appData.botLinks = filteredBotLinks;
+                    needsSave = true;
+                }
+                
+                // Identify user
+                let userId = 'guest';
+                let userName = translations[currentLanguage].guest;
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                    userId = tg.initDataUnsafe.user.id.toString();
+                    userName = tg.initDataUnsafe.user.first_name || tg.initDataUnsafe.user.username || 'User';
+                }
+
+                // If user doesn't exist in remote data, create them
+                if (!appData.users[userId]) {
+                    appData.users[userId] = { username: userName, points: 100, visitedBots: [] };
+                    needsSave = true;
+                }
+                
+                if (needsSave) {
+                    await saveRemoteState(appData);
+                }
+
+                const user = appData.users[userId];
+                currentUser = {
+                    id: userId,
+                    username: user.username,
+                    points: user.points
+                };
+
+                setLanguage(currentLanguage);
+            };
+
             // --- EVENT LISTENERS ---
             addBotBtn.addEventListener('click', handleAddBot);
             watchAdBtn.addEventListener('click', handleWatchAd);
@@ -669,9 +754,7 @@
             langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
 
             // --- INITIALIZATION ---
-            loadState();
-            setLanguage(currentLanguage);
-
+            initializeApp();
         });
     </script>
 </body>
