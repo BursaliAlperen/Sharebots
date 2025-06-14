@@ -242,9 +242,9 @@
             <div id="timer">5</div>
         </div>
 
-        <div id="bot-list-card" class="card">
+        <div id="bot-list-card" class="card" style="display: none;">
             <h2 data-key="addedBotsTitle">Eklenen Botlar</h2>
-            <p data-key="addedBotsDesc">Eklenen tüm botlar burada listelenir. Sahiplerinin yeterli puanı olan botları ziyaret edebilirsiniz.</p>
+            <p data-key="addedBotsDesc">Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.</p>
             <div id="bot-list-container">
                 <!-- Bots will be dynamically inserted here -->
             </div>
@@ -302,7 +302,7 @@
                     visitTaskCompleted: 'Görev tamamlandı! +10 Puan kazandınız.',
                     adErrorDuringVisit: 'Reklam hatası. Puan eklenemedi.',
                     addedBotsTitle: 'Eklenen Botlar',
-                    addedBotsDesc: 'Eklenen tüm botlar burada listelenir. Sahiplerinin yeterli puanı olan botları ziyaret edebilirsiniz.',
+                    addedBotsDesc: 'Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.',
                     noBotsAvailable: 'Gösterilecek uygun bot yok.',
                 },
                 en: {
@@ -331,7 +331,7 @@
                     visitTaskCompleted: 'Task complete! You earned +10 Points.',
                     adErrorDuringVisit: 'Ad error. Points could not be added.',
                     addedBotsTitle: 'Added Bots',
-                    addedBotsDesc: 'All added bots are listed here. You can visit bots whose owners have enough points.',
+                    addedBotsDesc: 'Only bots whose owners have enough points (>=10) are listed here.',
                     noBotsAvailable: 'No eligible bots to display.',
                 }
             };
@@ -353,7 +353,6 @@
             const visitBotLinkEl = document.getElementById('visit-bot-link');
             const timerEl = document.getElementById('timer');
             const botListContainer = document.getElementById('bot-list-container');
-            const botListCard = document.getElementById('bot-list-card');
             const langTrBtn = document.getElementById('lang-tr');
             const langEnBtn = document.getElementById('lang-en');
 
@@ -373,18 +372,13 @@
                 const savedData = JSON.parse(localStorage.getItem('botPointsAppData'));
                 if (savedData && savedData.users) {
                     appData = savedData;
-                    // MIGRATION: Remove system user and bots for any users with old data.
-                    if (appData.users.system) {
-                        delete appData.users.system;
-                    }
-                    if (appData.botLinks) {
-                        appData.botLinks = appData.botLinks.filter(bot => bot.owner !== 'system');
-                    }
                 } else {
-                    // Initial state for new users: no default bots.
                     appData = {
-                        users: {},
-                        botLinks: []
+                        users: { 'system': { username: 'System', points: 999999 } },
+                        botLinks: [
+                            { url: 'https://t.me/SpamBot', owner: 'system' },
+                            { url: 'https://t.me/Stickers', owner: 'system' }
+                        ]
                     };
                 }
 
@@ -439,14 +433,14 @@
                 const T = translations[currentLanguage];
                 botListContainer.innerHTML = ''; 
 
-                const botsToDisplay = appData.botLinks;
+                const eligibleBots = appData.botLinks.filter(bot => appData.users[bot.owner] && appData.users[bot.owner].points >= 10);
 
-                if (botsToDisplay.length === 0) {
+                if (eligibleBots.length === 0) {
                     botListContainer.innerHTML = `<p style="font-size:0.9em; text-align:center;">${T.noBotsAvailable || ''}</p>`;
                     return;
                 }
 
-                botsToDisplay.forEach(bot => {
+                eligibleBots.forEach(bot => {
                     const item = document.createElement('div');
                     item.className = 'bot-item';
                     item.textContent = bot.url;
@@ -575,7 +569,7 @@
                 }, 1000);
             };
 
-            const cancelVisitTask = async (message) => {
+            const cancelVisitTask = (message) => {
                 if (!visitTask.active) return;
                 clearInterval(visitTask.timerId);
                 document.removeEventListener('visibilitychange', visitTask.visibilityListener);
@@ -584,18 +578,6 @@
                 earnPointsCard.style.display = 'flex';
                 visitTaskCard.style.display = 'none';
                 showToast(message, 'error');
-
-                // Show 2 ads on failure
-                const T = translations[currentLanguage];
-                try {
-                    for (let i = 0; i < 2; i++) {
-                         await new Promise(res => setTimeout(res, 500));
-                         await window.show_9448585();
-                    }
-                } catch (error) {
-                    console.error('Ad error on task cancel:', error);
-                    showToast(T.adError, 'error');
-                }
             };
 
             const completeVisitTask = async () => {
@@ -605,7 +587,7 @@
                 showToast(T.visitTaskTimerDone, 'success');
 
                 try {
-                    for (let i = 0; i < 2; i++) {
+                    for (let i = 0; i < 5; i++) {
                          await new Promise(res => setTimeout(res, 500));
                          await window.show_9448585();
                     }
@@ -614,7 +596,7 @@
                     showToast(T.visitTaskCompleted, 'success');
 
                     const ownerId = visitTask.chosenBot.owner;
-                    if (appData.users[ownerId]) {
+                    if (appData.users[ownerId] && ownerId !== 'system') {
                         appData.users[ownerId].points -= 10; // Owner loses points
                     }
                     
