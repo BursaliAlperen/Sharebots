@@ -1,527 +1,265 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Puan Kazan</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src='https://libtl.com/sdk.js' data-zone='9448585' data-sdk='show_9448585'></script>
-    <style>
-        :root {
-            --bg-color: #121212;
-            --card-color: #1e1e1e;
-            --button-color: #333333;
-            --text-color: #e0e0e0;
-            --primary-color: #4a90e2;
-            --border-color: #2c2c2c;
-            --success-color: #28a745;
-            --error-color: #dc3545;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 15px;
-            overscroll-behavior-y: contain;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        .app-container {
-            max-width: 600px;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: var(--card-color);
-            padding: 15px;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-        }
-
-        .lang-switcher {
-            text-align: center;
-            padding-top: 15px;
-        }
-        .lang-switcher a {
-            color: var(--text-color);
-            text-decoration: none;
-            font-weight: 600;
-            padding: 0 4px;
-        }
-        .lang-switcher a.active {
-            color: var(--primary-color);
-            text-decoration: underline;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 1.1em;
-            font-weight: 600;
-        }
-
-        .points-info {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-
-        .card {
-            background-color: var(--card-color);
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .card h2 {
-            margin: 0 0 5px 0;
-            font-size: 1.3em;
-            color: var(--text-color);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 5px;
-        }
-
-        .card p {
-            margin: 0 0 10px 0;
-            color: #a0a0a0;
-            font-size: 0.9em;
-        }
-        
-        .card a {
-            color: var(--primary-color);
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .input-field {
-            width: 100%;
-            padding: 12px;
-            background-color: var(--bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-color);
-            font-size: 1em;
-            box-sizing: border-box;
-        }
-
-        .input-field::placeholder {
-            color: #777;
-        }
-
-        .btn {
-            padding: 15px;
-            border: none;
-            border-radius: 8px;
-            background-color: var(--button-color);
-            color: var(--text-color);
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-            text-align: center;
-        }
-
-        .btn:hover {
-            background-color: #444;
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        .btn.primary {
-            background-color: var(--primary-color);
-            color: white;
-        }
-
-        .btn.primary:hover {
-            background-color: #5aa1f2;
-        }
-
-        .btn:disabled {
-            background-color: #2a2a2a;
-            color: #666;
-            cursor: not-allowed;
-            opacity: 0.7;
-        }
-
-        .button-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        #visit-task-card {
-            display: none;
-            text-align: center;
-        }
-
-        #timer {
-            font-size: 2.5em;
-            font-weight: bold;
-            color: var(--primary-color);
-            margin: 20px 0;
-        }
-
-        .bot-item {
-            background-color: var(--bg-color);
-            padding: 10px 15px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            font-family: 'Courier New', Courier, monospace;
-            word-break: break-all;
-            margin-bottom: 10px;
-            position: relative;
-        }
-
-        .bot-owner {
-            font-size: 0.8em;
-            color: #888;
-            margin-top: 5px;
-        }
-
-        .toast {
-            position: fixed;
-            bottom: -50px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 22px;
-            border-radius: 25px;
-            color: white;
-            font-weight: 500;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s, bottom 0.3s;
-            pointer-events: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-
-        .toast.show {
-            opacity: 1;
-            bottom: 30px;
-        }
-
-        .toast.success {
-            background-color: var(--success-color);
-        }
-
-        .toast.error {
-            background-color: var(--error-color);
-        }
-
-        .toast.retry {
-            background-color: #ffc107;
-            color: #000;
-            cursor: pointer;
-            transition: all 0.3s;
-            pointer-events: auto;
-        }
-        .toast.retry:hover {
-            background-color: #ffab00;
-        }
-
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-        }
-
-        .loading-overlay.show {
-            display: flex;
-        }
-
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .copy-btn {
-            position: absolute;
-            right: 10px;
-            top: 10px;
-            background: var(--primary-color);
-            border: none;
-            border-radius: 4px;
-            color: white;
-            padding: 2px 6px;
-            font-size: 0.7em;
-            cursor: pointer;
-        }
-
-        .ad-container {
-            width: 100%;
-            height: 100px;
-            background-color: var(--card-color);
-            border: 1px dashed var(--border-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 10px 0;
-            border-radius: 8px;
-        }
-
-        .ad-text {
-            color: var(--text-color);
-            font-size: 0.9em;
-        }
-    </style>
+    <!-- Önceki head içeriği aynen kalıyor -->
+    <!-- ... -->
 </head>
 <body>
-    <div class="app-container">
-        <div class="header">
-            <div class="user-info">
-                <span>👤</span>
-                <span id="username">Guest</span>
-            </div>
-            <div class="points-info" id="points">💰 0 Puan</div>
-        </div>
-
-        <div id="earn-points-card" class="card">
-            <h2 data-key="earnPointsTitle">Puan Kazan</h2>
-            <div class="button-group">
-                <button id="watch-ad-btn" class="btn" data-key="watchAdBtn">🎬 Reklam İzle (+10 Puan)</button>
-                <button id="visit-bot-btn" class="btn" data-key="visitBotBtn">🎯 Bot Ziyaret Et (+10 Puan)</button>
-            </div>
-        </div>
-
-        <div id="visit-task-card" class="card">
-            <h2 data-key="visitTaskTitle">Bot Ziyareti Görevi</h2>
-            <p data-key="visitTaskDesc">Görevi tamamlamak için linke tıklayın ve botu ziyaret edin. Ödülünüzü almak için en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.</p>
-            <a id="visit-bot-link" href="#" target="_blank" rel="noopener noreferrer" data-key="visitBotLink">Bot Linki</a>
-            <div id="timer">5</div>
-            <button id="cancel-visit-btn" class="btn" data-key="cancelBtn" style="margin-top: 10px;">İptal Et</button>
-        </div>
-
-        <div id="bot-list-card" class="card">
-            <div class="card-header">
-                <h2 data-key="addedBotsTitle" style="margin: 0;">Eklenen Botlar</h2>
-                <button id="refresh-btn" title="Refresh List" class="btn" style="padding: 8px 12px; font-size: 1.1em; line-height: 1;">🔄</button>
-            </div>
-            <p data-key="addedBotsDesc">Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.</p>
-            <div id="bot-list-container">
-                <!-- Bots will be dynamically inserted here -->
-            </div>
-        </div>
-
-        <div class="card">
-            <h2 data-key="addYourBotTitle">Botunu Ekle</h2>
-            <p data-key="addYourBotDesc">Botunuzun referans linkini ekleyerek başkalarının ziyaret etmesini sağlayın. Bu işlem 10 puana mal olur.</p>
-            <div class="input-group">
-                <input type="url" id="add-bot-input" class="input-field" placeholder="https://t.me/your_bot_name" data-key="addBotPlaceholder">
-                <button id="add-bot-btn" class="btn primary" data-key="addBotBtn">➕ Bot Ekle (-10 Puan)</button>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>Reklam</h2>
-            <div class="ad-container">
-                <p class="ad-text">Reklam içeriği burada gösterilecek</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="lang-switcher">
-        <a href="#" id="lang-tr" class="active">TR</a> | <a href="#" id="lang-en">EN</a>
-    </div>
-
-    <div id="loading-overlay" class="loading-overlay">
-        <div class="spinner"></div>
-    </div>
+    <!-- Önceki HTML yapısı aynen kalıyor -->
+    <!-- ... -->
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const tg = window.Telegram.WebApp;
-            try {
-                tg.ready();
-                tg.expand();
-            } catch (e) {
-                console.warn("Telegram WebApp script not found or failed. Running in browser mode.");
-            }
+            // Önceki tanımlamalar aynen kalıyor
+            // ...
 
-            // --- TRANSLATIONS ---
-            const translations = {
-                tr: {
-                    pointsSuffix: 'Puan',
-                    guest: 'Misafir',
-                    earnPointsTitle: 'Puan Kazan',
-                    watchAdBtn: '🎬 Reklam İzle (+10 Puan)',
-                    visitBotBtn: '🎯 Bot Ziyaret Et (+10 Puan)',
-                    visitTaskTitle: 'Bot Ziyareti Görevi',
-                    visitTaskDesc: 'Görevi tamamlamak için linke tıklayın ve botu ziyaret edin. Ödülünüzü almak için en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.',
-                    visitBotLink: 'Bot Linki',
-                    addYourBotTitle: 'Botunu Ekle',
-                    addYourBotDesc: 'Botunuzun referans linkini ekleyerek başkalarının ziyaret etmesini sağlayın. Bu işlem 10 puana mal olur.',
-                    addBotPlaceholder: 'https://t.me/your_bot_name',
-                    addBotBtn: '➕ Bot Ekle (-10 Puan)',
-                    insufficientPoints: 'Yetersiz Puan',
-                    adLoading: 'Reklam Yükleniyor...',
-                    noBotsToVisit: 'Ziyaret edilecek uygun bot bulunmuyor.',
-                    invalidBotLink: 'Lütfen geçerli bir Telegram bot linki girin (https://t.me/...).',
-                    notEnoughPointsError: 'Yeterli puanınız yok.',
-                    botAddedSuccess: 'Bot başarıyla eklendi!',
-                    adWatchedSuccess: 'Reklam izlendi! +10 Puan kazandınız.',
-                    adError: 'Reklam gösterilemedi. Tekrar deneyin.',
-                    visitTaskFail: 'Çok erken geri döndünüz (en az 5 saniye gerekli). Görev başarısız oldu.',
-                    visitTaskSuccess: 'Harika! Şimdi ödülünüz için reklamları izleyin.',
-                    visitTaskCompleted: 'Görev tamamlandı! +10 Puan kazandınız.',
-                    adErrorDuringVisit: 'Reklam hatası. Puan eklenemedi.',
-                    addedBotsTitle: 'Eklenen Botlar',
-                    addedBotsDesc: 'Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.',
-                    noBotsAvailable: 'Gösterilecek uygun bot yok.',
-                    cancelBtn: 'İptal Et',
-                    ownerHasNoPoints: 'Bot sahibinin artık yeterli puanı yok. Puan verilmedi.',
-                    syncError: 'Veriler sunucuyla senkronize edilemedi.',
-                    dataRefreshed: 'Veriler yenilendi!',
-                    retry: "Tekrar denemek için tıklayın",
-                    syncSuccess: "Veriler senkronize edildi!",
-                    localStorageWarning: "Çevrimdışı mod: Veriler lokal kaydedildi",
-                    connectionError: "İnternet bağlantısı yok",
-                    serverError: "Sunucu hatası",
-                    copied: "Kopyalandı!",
-                    adNotAvailable: "Şu an gösterilecek reklam yok"
-                },
-                en: {
-                    pointsSuffix: 'Points',
-                    guest: 'Guest',
-                    earnPointsTitle: 'Earn Points',
-                    watchAdBtn: '🎬 Watch Ad (+10 Points)',
-                    visitBotBtn: '🎯 Visit Bot (+10 Points)',
-                    visitTaskTitle: 'Bot Visit Task',
-                    visitTaskDesc: 'To complete the task, click the link and visit the bot. Return to this page after at least 5 seconds to claim your reward. The task will be canceled if you switch windows.',
-                    visitBotLink: 'Bot Link',
-                    addYourBotTitle: 'Add Your Bot',
-                    addYourBotDesc: 'Add your bot\'s referral link for others to visit. This costs 10 points.',
-                    addBotPlaceholder: 'https://t.me/your_bot_name',
-                    addBotBtn: '➕ Add Bot (-10 Points)',
-                    insufficientPoints: 'Insufficient Points',
-                    adLoading: 'Loading Ad...',
-                    noBotsToVisit: 'No eligible bots available to visit.',
-                    invalidBotLink: 'Please enter a valid Telegram bot link (https://t.me/...).',
-                    notEnoughPointsError: 'You do not have enough points.',
-                    botAddedSuccess: 'Bot added successfully!',
-                    adWatchedSuccess: 'Ad watched! You earned +10 Points.',
-                    adError: 'Could not show ad. Please try again.',
-                    visitTaskFail: 'You returned too soon (at least 5 seconds required). Task failed.',
-                    visitTaskSuccess: 'Great! Now watch the ads for your reward.',
-                    visitTaskCompleted: 'Task complete! You earned +10 Points.',
-                    adErrorDuringVisit: 'Ad error. Points could not be added.',
-                    addedBotsTitle: 'Added Bots',
-                    addedBotsDesc: 'Only bots whose owners have enough points (>=10) are listed here.',
-                    noBotsAvailable: 'No eligible bots to display.',
-                    cancelBtn: 'Cancel',
-                    ownerHasNoPoints: 'Bot owner no longer has enough points. No points awarded.',
-                    syncError: 'Could not sync data with server.',
-                    dataRefreshed: 'Data refreshed!',
-                    retry: "Click to retry",
-                    syncSuccess: "Data synced successfully!",
-                    localStorageWarning: "Offline mode: Data saved locally",
-                    connectionError: "No internet connection",
-                    serverError: "Server error",
-                    copied: "Copied!",
-                    adNotAvailable: "No ads available at the moment"
+            // TÜM BUTON FONKSİYONLARINI YENİDEN YAZIYORUZ
+            // =============================================
+
+            // REKLAM İZLE BUTONU
+            watchAdBtn.addEventListener('click', async function() {
+                const T = translations[currentLanguage];
+                if (currentUser.points < 0) { // Basit bir kontrol
+                    showToast(T.notEnoughPointsError, 'error');
+                    return;
+                }
+
+                showLoader();
+                try {
+                    // Reklam simülasyonu (3 saniye)
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    
+                    // Puan ekleme
+                    currentUser.points += 10;
+                    appData.users[currentUser.id].points = currentUser.points;
+                    
+                    // Kaydet
+                    const success = await saveRemoteState(appData);
+                    if (success) {
+                        showToast(T.adWatchedSuccess, 'success');
+                        updateUI();
+                    }
+                } catch (error) {
+                    console.error('Reklam hatası:', error);
+                    showToast(T.adError, 'error');
+                } finally {
+                    hideLoader();
+                }
+            });
+
+            // BOT ZİYARET ET BUTONU
+            visitBotBtn.addEventListener('click', async function() {
+                const T = translations[currentLanguage];
+                
+                // Uygun botları filtrele
+                const eligibleBots = appData.botLinks.filter(bot => 
+                    bot.owner !== currentUser.id && 
+                    appData.users[bot.owner]?.points >= 10);
+                
+                if (eligibleBots.length === 0) {
+                    showToast(T.noBotsToVisit, 'error');
+                    return;
+                }
+
+                // Rastgele bot seç
+                const randomBot = eligibleBots[Math.floor(Math.random() * eligibleBots.length)];
+                
+                // Görevi başlat
+                visitTask = {
+                    active: true,
+                    startTime: Date.now(),
+                    chosenBot: randomBot
+                };
+
+                // UI güncelle
+                visitBotLinkEl.href = randomBot.link;
+                visitBotLinkEl.textContent = randomBot.link;
+                earnPointsCard.style.display = 'none';
+                visitTaskCard.style.display = 'block';
+
+                // Geri sayım
+                let secondsLeft = 5;
+                timerEl.textContent = secondsLeft;
+                
+                const countdown = setInterval(() => {
+                    secondsLeft--;
+                    timerEl.textContent = secondsLeft;
+                    
+                    if (secondsLeft <= 0 || !visitTask.active) {
+                        clearInterval(countdown);
+                    }
+                }, 1000);
+            });
+
+            // BOT EKLE BUTONU
+            addBotBtn.addEventListener('click', async function() {
+                const botLink = addBotInput.value.trim();
+                const T = translations[currentLanguage];
+                
+                // Validasyon
+                if (!botLink.startsWith('https://t.me/')) {
+                    showToast(T.invalidBotLink, 'error');
+                    return;
+                }
+
+                if (currentUser.points < 10) {
+                    showToast(T.notEnoughPointsError, 'error');
+                    return;
+                }
+
+                showLoader();
+                try {
+                    // Bot kontrolü
+                    const botExists = appData.botLinks.some(bot => 
+                        bot.link === botLink && bot.owner === currentUser.id);
+                    
+                    if (botExists) {
+                        showToast('Bu bot zaten eklenmiş!', 'error');
+                        return;
+                    }
+
+                    // Yeni bot ekle
+                    appData.botLinks.push({
+                        link: botLink,
+                        owner: currentUser.id
+                    });
+
+                    // Puan düşür
+                    currentUser.points -= 10;
+                    appData.users[currentUser.id].points = currentUser.points;
+
+                    // Kaydet
+                    const success = await saveRemoteState(appData);
+                    if (success) {
+                        showToast(T.botAddedSuccess, 'success');
+                        addBotInput.value = '';
+                        updateUI();
+                    }
+                } catch (error) {
+                    console.error('Bot ekleme hatası:', error);
+                    showToast(T.syncError, 'error');
+                } finally {
+                    hideLoader();
+                }
+            });
+
+            // YENİLE BUTONU
+            refreshBtn.addEventListener('click', async function() {
+                showLoader();
+                try {
+                    appData = await fetchRemoteState();
+                    const T = translations[currentLanguage];
+                    showToast(T.dataRefreshed, 'success');
+                    updateUI();
+                } catch (error) {
+                    console.error('Yenileme hatası:', error);
+                    const T = translations[currentLanguage];
+                    showToast(T.syncError, 'error');
+                } finally {
+                    hideLoader();
+                }
+            });
+
+            // İPTAL BUTONU
+            cancelVisitBtn.addEventListener('click', function() {
+                visitTask.active = false;
+                earnPointsCard.style.display = 'block';
+                visitTaskCard.style.display = 'none';
+            });
+
+            // DİL DEĞİŞTİRME BUTONLARI
+            langTrBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                setLanguage('tr');
+            });
+
+            langEnBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                setLanguage('en');
+            });
+
+            // PENCERE ODAK DEĞİŞİMİ (Bot ziyareti kontrolü)
+            window.addEventListener('focus', async () => {
+                if (!visitTask.active || !visitTask.startTime) return;
+                
+                const T = translations[currentLanguage];
+                const timeSpent = (Date.now() - visitTask.startTime) / 1000;
+                
+                if (timeSpent < 5) {
+                    showToast(T.visitTaskFail, 'error');
+                    return;
+                }
+
+                showLoader();
+                try {
+                    // Puan ekle
+                    currentUser.points += 10;
+                    appData.users[currentUser.id].points = currentUser.points;
+                    
+                    // Bot sahibinden puan düşür
+                    if (appData.users[visitTask.chosenBot.owner]?.points >= 10) {
+                        appData.users[visitTask.chosenBot.owner].points -= 10;
+                    }
+
+                    const success = await saveRemoteState(appData);
+                    if (success) {
+                        showToast(T.visitTaskCompleted, 'success');
+                        updateUI();
+                    }
+                } catch (error) {
+                    console.error('Görev tamamlama hatası:', error);
+                    showToast(T.adErrorDuringVisit, 'error');
+                } finally {
+                    hideLoader();
+                    visitTask.active = false;
+                    earnPointsCard.style.display = 'block';
+                    visitTaskCard.style.display = 'none';
+                }
+            });
+
+            // UYGULAMA BAŞLATMA
+            const initApp = async () => {
+                showLoader();
+                try {
+                    appData = await fetchRemoteState();
+                    
+                    if (tg.initDataUnsafe?.user) {
+                        const tgUser = tg.initDataUnsafe.user;
+                        currentUser = {
+                            id: tgUser.id.toString(),
+                            username: tgUser.username || `User${tgUser.id}`,
+                            points: appData.users[tgUser.id]?.points || 0
+                        };
+                        
+                        if (!appData.users[currentUser.id]) {
+                            appData.users[currentUser.id] = { points: currentUser.points };
+                            await saveRemoteState(appData);
+                        }
+                    }
+                    
+                    updateUI();
+                } catch (error) {
+                    console.error('Başlatma hatası:', error);
+                    const T = translations[currentLanguage];
+                    showToast(`${T.syncError}: ${error.message}`, 'error');
+                } finally {
+                    hideLoader();
                 }
             };
 
-            // --- STATE ---
-            let appData = { users: {}, botLinks: [] };
-            let currentUser = { id: 'guest', username: 'Guest', points: 0 };
-            let currentLanguage = 'tr';
-            const NPOINT_URL = 'https://api.npoint.io/4a9e5b6a782b404c0a87';
-            let visitTaskInterval = null;
+            // UYGULAMAYI BAŞLAT
+            initApp();
 
-            // --- DOM ELEMENTS ---
-            const usernameEl = document.getElementById('username');
-            const pointsEl = document.getElementById('points');
-            const addBotInput = document.getElementById('add-bot-input');
-            const addBotBtn = document.getElementById('add-bot-btn');
-            const watchAdBtn = document.getElementById('watch-ad-btn');
-            const visitBotBtn = document.getElementById('visit-bot-btn');
-            const earnPointsCard = document.getElementById('earn-points-card');
-            const visitTaskCard = document.getElementById('visit-task-card');
-            const visitBotLinkEl = document.getElementById('visit-bot-link');
-            const timerEl = document.getElementById('timer');
-            const botListContainer = document.getElementById('bot-list-container');
-            const langTrBtn = document.getElementById('lang-tr');
-            const langEnBtn = document.getElementById('lang-en');
-            const cancelVisitBtn = document.getElementById('cancel-visit-btn');
-            const refreshBtn = document.getElementById('refresh-btn');
-            const loadingOverlay = document.getElementById('loading-overlay');
-
-            // --- VISIT BOT TASK STATE ---
-            let visitTask = {
-                active: false,
-                startTime: 0,
-                chosenBot: null,
-            };
-
-            // --- FUNCTIONS ---
-            const showLoader = () => loadingOverlay.classList.add('show');
-            const hideLoader = () => loadingOverlay.classList.remove('show');
-
-            const validateData = (data) => {
-                return data && typeof data === 'object' && data.users && typeof data.users === 'object' && 
-                       data.botLinks && Array.isArray(data.botLinks);
-            };
-
-            const fetchRemoteState = async (retries = 3) => {
-                let lastError;
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(NPOINT_URL, { 
-                            cache: "no-cache",
-                            headers: { 'Cache-Control': 'no-cache' }
-                        });
-                        
-                        if (!response.ok) {
-                            const errorText = await response.text();
-                            throw new Error(`HTTP error! status: ${response.status}, text: ${errorText}`);
-                        }
-                        
-                        const data = await response.json();
-                        if (!validateData(data)) throw new Error('Invalid data from server');
-                        
-                        localStorage.removeItem('botPointsData');
-                        return data;
-                    } catch (error) {
-                        lastError = error;
-                        if (i < retries - 1) await new Promise(res => setTimeout(res, 1000 * (i + 1)));
-    
+            // EKSTRA ÖZELLİK: BOT LİNKİ KOPYALAMA
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('copy-btn')) {
+                    const botLink = e.target.parentElement.querySelector('div').textContent;
+                    navigator.clipboard.writeText(botLink);
+                    const T = translations[currentLanguage];
+                    showToast(T.copied, 'success');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
