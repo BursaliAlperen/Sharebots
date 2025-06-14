@@ -193,6 +193,14 @@
             border: 1px solid var(--border-color);
             font-family: 'Courier New', Courier, monospace;
             word-break: break-all;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .bot-owner {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 5px;
         }
 
         .toast {
@@ -265,6 +273,36 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .copy-btn {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background: var(--primary-color);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            padding: 2px 6px;
+            font-size: 0.7em;
+            cursor: pointer;
+        }
+
+        .ad-container {
+            width: 100%;
+            height: 100px;
+            background-color: var(--card-color);
+            border: 1px dashed var(--border-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+
+        .ad-text {
+            color: var(--text-color);
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body>
@@ -310,6 +348,13 @@
             <div class="input-group">
                 <input type="url" id="add-bot-input" class="input-field" placeholder="https://t.me/your_bot_name" data-key="addBotPlaceholder">
                 <button id="add-bot-btn" class="btn primary" data-key="addBotBtn">➕ Bot Ekle (-10 Puan)</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Reklam</h2>
+            <div class="ad-container">
+                <p class="ad-text">Reklam içeriği burada gösterilecek</p>
             </div>
         </div>
     </div>
@@ -370,7 +415,9 @@
                     syncSuccess: "Veriler senkronize edildi!",
                     localStorageWarning: "Çevrimdışı mod: Veriler lokal kaydedildi",
                     connectionError: "İnternet bağlantısı yok",
-                    serverError: "Sunucu hatası"
+                    serverError: "Sunucu hatası",
+                    copied: "Kopyalandı!",
+                    adNotAvailable: "Şu an gösterilecek reklam yok"
                 },
                 en: {
                     pointsSuffix: 'Points',
@@ -408,7 +455,9 @@
                     syncSuccess: "Data synced successfully!",
                     localStorageWarning: "Offline mode: Data saved locally",
                     connectionError: "No internet connection",
-                    serverError: "Server error"
+                    serverError: "Server error",
+                    copied: "Copied!",
+                    adNotAvailable: "No ads available at the moment"
                 }
             };
 
@@ -417,6 +466,7 @@
             let currentUser = { id: 'guest', username: 'Guest', points: 0 };
             let currentLanguage = 'tr';
             const NPOINT_URL = 'https://api.npoint.io/4a9e5b6a782b404c0a87';
+            let visitTaskInterval = null;
 
             // --- DOM ELEMENTS ---
             const usernameEl = document.getElementById('username');
@@ -474,37 +524,4 @@
                     } catch (error) {
                         lastError = error;
                         if (i < retries - 1) await new Promise(res => setTimeout(res, 1000 * (i + 1)));
-                    }
-                }
-                
-                // Fallback to localStorage
-                const localData = localStorage.getItem('botPointsData');
-                if (localData) {
-                    try {
-                        const parsed = JSON.parse(localData);
-                        if (validateData(parsed)) {
-                            console.warn('Using localStorage fallback');
-                            const T = translations[currentLanguage];
-                            showToast(T.localStorageWarning, 'error');
-                            return parsed;
-                        }
-                    } catch (e) {
-                        console.error('LocalStorage parse error:', e);
-                    }
-                }
-                
-                throw lastError;
-            };
-
-            const saveRemoteState = async (dataToSave, retries = 3) => {
-                if (!validateData(dataToSave)) throw new Error('Invalid data structure');
-                
-                let lastError;
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(NPOINT_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(dataToSave),
-                        });
-                 
+    
