@@ -1,0 +1,435 @@
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puan Kazan</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@500&display=swap" rel="stylesheet">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div id="login-view">
+        <main class="container">
+            <div class="card">
+                <h1>Hoş Geldiniz!</h1>
+                <p>Devam etmek için giriş yapın.</p>
+                <div class="telegram-login-container">
+                    <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="Sharebots" data-size="large" data-onauth="onTelegramAuth(user)" data-request-access="write"></script>
+                    <p class="widget-info">Telegram ile giriş yapmak için yukarıdaki butona tıklayın.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="app-view" style="display: none;">
+        <div class="app-container">
+            <div class="header">
+                <div class="user-info">
+                    <span>👤</span>
+                    <span id="username">Guest</span>
+                </div>
+                <div class="points-info" id="points">💰 0 Puan</div>
+            </div>
+
+            <div id="earn-points-card" class="card">
+                <h2 data-key="earnPointsTitle">Puan Kazan</h2>
+                <div class="button-group">
+                    <button id="watch-ad-btn" class="btn" data-key="watchAdBtn">🎬 Reklam İzle (+10 Puan)</button>
+                    <button id="visit-bot-btn" class="btn" data-key="visitBotBtn">🎯 Bot Ziyaret Et (+10 Puan)</button>
+                </div>
+            </div>
+
+            <div id="visit-task-card" class="card" style="display: none;">
+                <h2 data-key="visitTaskTitle">Bot Ziyareti Görevi</h2>
+                <p data-key="visitTaskDesc">Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.</p>
+                <a id="visit-bot-link" href="#" target="_blank" rel="noopener noreferrer" data-key="visitBotLink">Bot Linki</a>
+                <div id="timer">5</div>
+                <button id="cancel-visit-btn" class="btn" data-key="cancelBtn" style="margin-top: 10px;">İptal Et</button>
+            </div>
+
+            <div id="bot-list-card" class="card" style="display: none;">
+                <h2 data-key="addedBotsTitle">Eklenen Botlar</h2>
+                <p data-key="addedBotsDesc">Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.</p>
+                <div id="bot-list-container">
+                    <!-- Bots will be dynamically inserted here -->
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 data-key="addYourBotTitle">Botunu Ekle</h2>
+                <p data-key="addYourBotDesc">Botunuzun referans linkini ekleyerek başkalarının ziyaret etmesini sağlayın. Bu işlem 10 puana mal olur.</p>
+                <div class="input-group">
+                    <input type="url" id="add-bot-input" class="input-field" placeholder="https://t.me/your_bot_name" data-key="addBotPlaceholder">
+                    <button id="add-bot-btn" class="btn primary" data-key="addBotBtn">➕ Bot Ekle (-10 Puan)</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="lang-switcher">
+            <a href="#" id="lang-tr" class="active">TR</a> | <a href="#" id="lang-en">EN</a>
+        </div>
+    </div>
+    <script src='https://libtl.com/sdk.js' data-zone='9448585' data-sdk='show_9448585'></script>
+    <script>
+        // This function must be in the global scope for the Telegram widget to call it.
+        function onTelegramAuth(user) {
+            localStorage.setItem('telegram_user', JSON.stringify(user));
+            startApp(user);
+        }
+
+        function startApp(user) {
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('app-view').style.display = 'block';
+            
+            // Adjust body style for the app theme
+            const body = document.body;
+            body.style.backgroundColor = 'var(--app-bg)';
+            body.style.display = 'block';
+            body.style.justifyContent = 'initial';
+            body.style.alignItems = 'initial';
+            body.style.height = 'auto';
+
+            // Initialize the main application
+            initializeApp(user);
+        }
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tg = window.Telegram.WebApp;
+
+            // Check if running inside Telegram
+            if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && Object.keys(tg.initDataUnsafe.user).length > 0) {
+                try {
+                    tg.ready();
+                    tg.expand();
+                } catch(e) {
+                    console.warn("Telegram WebApp script error", e);
+                }
+                startApp(tg.initDataUnsafe.user);
+            } else {
+                // Check for a logged-in user in localStorage (from widget)
+                const loggedInUser = JSON.parse(localStorage.getItem('telegram_user'));
+                if (loggedInUser) {
+                    startApp(loggedInUser);
+                }
+                // If neither, the login view remains visible by default.
+            }
+        });
+
+
+        // Main application logic is wrapped in this function
+        function initializeApp(user) {
+            // --- TRANSLATIONS ---
+            const translations = {
+                tr: {
+                    pointsSuffix: 'Puan', guest: 'Misafir', earnPointsTitle: 'Puan Kazan',
+                    watchAdBtn: '🎬 Reklam İzle (+10 Puan)', visitBotBtn: '🎯 Bot Ziyaret Et (+10 Puan)',
+                    visitTaskTitle: 'Bot Ziyareti Görevi',
+                    visitTaskDesc: 'Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.',
+                    visitBotLink: 'Bot Linki', addYourBotTitle: 'Botunu Ekle',
+                    addYourBotDesc: 'Botunuzun referans linkini ekleyerek başkalarının ziyaret etmesini sağlayın. Bu işlem 10 puana mal olur.',
+                    addBotPlaceholder: 'https://t.me/your_bot_name', addBotBtn: '➕ Bot Ekle (-10 Puan)',
+                    insufficientPoints: 'Yetersiz Puan', adLoading: 'Reklam Yükleniyor...',
+                    noBotsToVisit: 'Ziyaret edilecek uygun bot bulunmuyor.',
+                    invalidBotLink: 'Lütfen geçerli bir Telegram bot linki girin (https://t.me/...).',
+                    notEnoughPointsError: 'Yeterli puanınız yok.', botAddedSuccess: 'Bot başarıyla eklendi!',
+                    adWatchedSuccess: 'Reklam izlendi! +10 Puan kazandınız.', adError: 'Reklam gösterilemedi. Tekrar deneyin.',
+                    visitTaskFail: 'Çok erken geri döndünüz. Görev başarısız oldu.',
+                    visitTaskSuccess: 'Harika! Şimdi ödülünüz için reklamları izleyin.',
+                    visitTaskCompleted: 'Görev tamamlandı! +10 Puan kazandınız.', adErrorDuringVisit: 'Reklam hatası. Puan eklenemedi.',
+                    addedBotsTitle: 'Eklenen Botlar',
+                    addedBotsDesc: 'Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.',
+                    noBotsAvailable: 'Gösterilecek uygun bot yok.', cancelBtn: 'İptal Et',
+                },
+                en: {
+                    pointsSuffix: 'Points', guest: 'Guest', earnPointsTitle: 'Earn Points',
+                    watchAdBtn: '🎬 Watch Ad (+10 Points)', visitBotBtn: '🎯 Visit Bot (+10 Points)',
+                    visitTaskTitle: 'Bot Visit Task',
+                    visitTaskDesc: 'To complete the task, click the link, visit the bot, and return to this page after at least 5 seconds. The task will be canceled if you switch windows.',
+                    visitBotLink: 'Bot Link', addYourBotTitle: 'Add Your Bot',
+                    addYourBotDesc: 'Add your bot\'s referral link for others to visit. This costs 10 points.',
+                    addBotPlaceholder: 'https://t.me/your_bot_name', addBotBtn: '➕ Add Bot (-10 Points)',
+                    insufficientPoints: 'Insufficient Points', adLoading: 'Loading Ad...',
+                    noBotsToVisit: 'No eligible bots available to visit.',
+                    invalidBotLink: 'Please enter a valid Telegram bot link (https://t.me/...).',
+                    notEnoughPointsError: 'You do not have enough points.', botAddedSuccess: 'Bot added successfully!',
+                    adWatchedSuccess: 'Ad watched! You earned +10 Points.', adError: 'Could not show ad. Please try again.',
+                    visitTaskFail: 'You returned too soon. Task failed.',
+                    visitTaskSuccess: 'Great! Now watch the ads for your reward.',
+                    visitTaskCompleted: 'Task complete! You earned +10 Points.', adErrorDuringVisit: 'Ad error. Points could not be added.',
+                    addedBotsTitle: 'Added Bots',
+                    addedBotsDesc: 'Only bots whose owners have enough points (>=10) are listed here.',
+                    noBotsAvailable: 'No eligible bots to display.', cancelBtn: 'Cancel',
+                }
+            };
+
+            // --- STATE ---
+            let appData = {};
+            let currentUser = { id: 'guest', username: 'Guest', points: 0 };
+            let currentLanguage = 'tr';
+
+            // --- DOM ELEMENTS ---
+            const usernameEl = document.getElementById('username');
+            const pointsEl = document.getElementById('points');
+            const addBotInput = document.getElementById('add-bot-input');
+            const addBotBtn = document.getElementById('add-bot-btn');
+            const watchAdBtn = document.getElementById('watch-ad-btn');
+            const visitBotBtn = document.getElementById('visit-bot-btn');
+            const earnPointsCard = document.getElementById('earn-points-card');
+            const visitTaskCard = document.getElementById('visit-task-card');
+            const visitBotLinkEl = document.getElementById('visit-bot-link');
+            const timerEl = document.getElementById('timer');
+            const botListContainer = document.getElementById('bot-list-container');
+            const botListCard = document.getElementById('bot-list-card'); // Added for show/hide
+            const langTrBtn = document.getElementById('lang-tr');
+            const langEnBtn = document.getElementById('lang-en');
+            const cancelVisitBtn = document.getElementById('cancel-visit-btn');
+
+            // --- VISIT BOT TASK STATE ---
+            let visitTask = { active: false, startTime: 0, chosenBot: null };
+
+            // --- FUNCTIONS ---
+            const loadState = () => {
+                currentLanguage = localStorage.getItem('botPointsLang') || 'tr';
+
+                const savedData = JSON.parse(localStorage.getItem('botPointsAppData'));
+                appData = (savedData && savedData.users) ? savedData : {
+                    users: { 'system': { username: 'System', points: 999999 } },
+                    botLinks: [
+                        { url: 'https://t.me/SpamBot', owner: 'system' },
+                        { url: 'https://t.me/Stickers', owner: 'system' }
+                    ]
+                };
+
+                let userId = user.id.toString();
+                let userName = user.first_name || user.username || 'User';
+
+                if (!appData.users[userId]) {
+                    appData.users[userId] = { username: userName, points: 100, visitedBots: [] };
+                }
+                if (!appData.users[userId].visitedBots) {
+                    appData.users[userId].visitedBots = [];
+                }
+                
+                currentUser = { id: userId, username: userName, points: appData.users[userId].points };
+
+                saveState();
+            };
+
+            const saveState = () => {
+                if (appData.users[currentUser.id]) {
+                    appData.users[currentUser.id].points = currentUser.points;
+                }
+                localStorage.setItem('botPointsAppData', JSON.stringify(appData));
+            };
+
+            const setLanguage = (lang) => {
+                currentLanguage = lang;
+                localStorage.setItem('botPointsLang', lang);
+
+                langTrBtn.classList.toggle('active', lang === 'tr');
+                langEnBtn.classList.toggle('active', lang === 'en');
+
+                document.querySelectorAll('#app-view [data-key]').forEach(el => {
+                    const key = el.dataset.key;
+                    if (translations[lang][key]) {
+                        if (el.tagName === 'INPUT' && el.placeholder) {
+                            el.placeholder = translations[lang][key];
+                        } else {
+                           el.textContent = translations[lang][key];
+                        }
+                    }
+                });
+                updateUI();
+            };
+            
+            const renderBotList = () => {
+                const T = translations[currentLanguage];
+                botListContainer.innerHTML = ''; 
+
+                const eligibleBots = appData.botLinks.filter(bot => appData.users[bot.owner] && appData.users[bot.owner].points >= 10);
+                
+                if (eligibleBots.length > 0) {
+                    botListCard.style.display = 'flex';
+                    eligibleBots.forEach(bot => {
+                        const item = document.createElement('div');
+                        item.className = 'bot-item';
+                        item.textContent = bot.url;
+                        botListContainer.appendChild(item);
+                    });
+                } else {
+                    botListCard.style.display = 'none';
+                }
+            };
+
+            const updateUI = () => {
+                const T = translations[currentLanguage];
+                
+                usernameEl.textContent = currentUser.username;
+                pointsEl.textContent = `💰 ${currentUser.points} ${T.pointsSuffix}`;
+                
+                watchAdBtn.textContent = T.watchAdBtn;
+                visitBotBtn.textContent = T.visitBotBtn;
+
+                addBotBtn.disabled = currentUser.points < 10;
+                addBotBtn.textContent = currentUser.points < 10 ? T.insufficientPoints : T.addBotBtn;
+
+                const visitedBots = appData.users[currentUser.id]?.visitedBots || [];
+                const eligibleBotsForVisit = appData.botLinks.filter(bot => 
+                    bot.owner !== currentUser.id && 
+                    appData.users[bot.owner] && 
+                    appData.users[bot.owner].points >= 10 &&
+                    !visitedBots.includes(bot.url)
+                );
+                visitBotBtn.disabled = eligibleBotsForVisit.length === 0;
+
+                renderBotList();
+            };
+
+            const showToast = (message, type = 'success') => {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+
+                setTimeout(() => toast.classList.add('show'), 10);
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => document.body.contains(toast) && document.body.removeChild(toast), 300);
+                }, 3000);
+            };
+
+            const changePoints = (amount) => {
+                currentUser.points += amount;
+                updateUI();
+            };
+
+            const handleAddBot = () => {
+                const T = translations[currentLanguage];
+                if (addBotBtn.disabled) return;
+                const link = addBotInput.value.trim();
+                if (!link.startsWith('https://t.me/')) {
+                    return showToast(T.invalidBotLink, 'error');
+                }
+                if (currentUser.points < 10) {
+                    return showToast(T.notEnoughPointsError, 'error');
+                }
+
+                changePoints(-10);
+                appData.botLinks.push({ url: link, owner: currentUser.id });
+                saveState();
+                updateUI();
+                addBotInput.value = '';
+                showToast(T.botAddedSuccess);
+            };
+
+            const handleWatchAd = () => {
+                const T = translations[currentLanguage];
+                watchAdBtn.disabled = true;
+                watchAdBtn.textContent = T.adLoading;
+
+                show_9448585().then(() => {
+                    changePoints(10);
+                    saveState();
+                    showToast(T.adWatchedSuccess);
+                }).catch((error) => {
+                    showToast(T.adError, 'error');
+                    console.error("Ad error:", error);
+                }).finally(() => {
+                    watchAdBtn.disabled = false;
+                    updateUI();
+                });
+            };
+
+            const resetVisitTask = () => {
+                document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
+                visitTask.active = false;
+                visitTask.chosenBot = null;
+                visitTask.startTime = 0;
+                
+                earnPointsCard.style.display = 'flex';
+                visitTaskCard.style.display = 'none';
+            };
+
+            const handleVisitFail = async () => {
+                const T = translations[currentLanguage];
+                showToast(T.visitTaskFail, 'error');
+                resetVisitTask();
+                updateUI();
+            };
+
+            const handleVisitSuccess = async () => {
+                const T = translations[currentLanguage];
+                changePoints(10);
+                const owner = appData.users[visitTask.chosenBot.owner];
+                if (owner) owner.points -= 10;
+                
+                appData.users[currentUser.id].visitedBots.push(visitTask.chosenBot.url);
+                saveState();
+                showToast(T.visitTaskCompleted);
+
+                resetVisitTask();
+                updateUI();
+            };
+
+            let visibilityHandler = null;
+            const handleVisibilityChangeForVisit = () => {
+                if (!visitTask.active) return;
+                if (document.visibilityState === 'hidden' && visitTask.startTime === 0) {
+                    visitTask.startTime = Date.now();
+                } else if (document.visibilityState === 'visible' && visitTask.startTime > 0) {
+                    const elapsed = Date.now() - visitTask.startTime;
+                    document.removeEventListener('visibilitychange', visibilityHandler);
+                    if (elapsed >= 5000) handleVisitSuccess();
+                    else handleVisitFail();
+                }
+            };
+            
+            const startVisitTask = (bot) => {
+                visitTask = { active: true, chosenBot: bot, startTime: 0 };
+                earnPointsCard.style.display = 'none';
+                visitTaskCard.style.display = 'flex';
+                timerEl.style.display = 'none';
+                visitBotLinkEl.href = bot.url;
+
+                visibilityHandler = handleVisibilityChangeForVisit;
+                // Add the visibility listener only after the user clicks the link
+                visitBotLinkEl.addEventListener('click', () => {
+                    document.addEventListener('visibilitychange', visibilityHandler);
+                }, { once: true });
+            };
+
+            const handleVisitBot = () => {
+                const T = translations[currentLanguage];
+                const visitedBots = appData.users[currentUser.id].visitedBots || [];
+                const eligibleBots = appData.botLinks.filter(bot => 
+                    bot.owner !== currentUser.id && 
+                    appData.users[bot.owner] && 
+                    appData.users[bot.owner].points >= 10 &&
+                    !visitedBots.includes(bot.url)
+                );
+                if (eligibleBots.length === 0) return showToast(T.noBotsToVisit, 'info');
+                const chosenBot = eligibleBots[Math.floor(Math.random() * eligibleBots.length)];
+                startVisitTask(chosenBot);
+            };
+
+            // --- EVENT LISTENERS ---
+            addBotBtn.addEventListener('click', handleAddBot);
+            watchAdBtn.addEventListener('click', handleWatchAd);
+            visitBotBtn.addEventListener('click', handleVisitBot);
+            cancelVisitBtn.addEventListener('click', () => {
+                resetVisitTask();
+                updateUI();
+            });
+            langTrBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('tr'); });
+            langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
+
+            // --- INITIALIZATION ---
+            loadState();
+            setLanguage(currentLanguage);
+        }
+    </script>
+</body>
+</html>
