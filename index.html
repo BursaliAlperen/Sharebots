@@ -30,7 +30,7 @@
         .app-container {
             max-width: 600px;
             margin: 0 auto;
-            display: flex;
+            display: none; /* Hide by default, show after auth */
             flex-direction: column;
             gap: 20px;
         }
@@ -216,6 +216,14 @@
             background-color: var(--error-color);
         }
         
+        #login-container {
+            display: none; /* Shown for non-authed users on web */
+            text-align: center;
+            padding: 50px 15px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
         .loader-overlay {
             position: fixed;
             top: 0;
@@ -253,6 +261,19 @@
         <div class="spinner"></div>
         <span data-key="loading">Yükleniyor...</span>
     </div>
+
+    <div id="login-container">
+        <h2 data-key="loginTitle">Giriş Yap</h2>
+        <p data-key="loginDesc">Lütfen devam etmek için Telegram ile giriş yapın.</p>
+        <script async src="https://telegram.org/js/telegram-widget.js?22"
+                data-telegram-login="sharebots_bot"
+                data-size="large"
+                data-userpic="false"
+                data-auth-url="https://us-central1-sharebots-c6cf2.cloudfunctions.net/authTelegram"
+                data-request-access="write">
+        </script>
+    </div>
+
     <div class="app-container">
         <div class="header">
             <div class="user-info">
@@ -305,17 +326,17 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-analytics.js";
         import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, addDoc, getDocs, query, where, arrayUnion, runTransaction, writeBatch } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
 
         // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyA--y48rZEOG9jc50icr7pLgQgxeNYQry4",
             authDomain: "sharebots-c6cf2.firebaseapp.com",
             projectId: "sharebots-c6cf2",
-            storageBucket: "sharebots-c6cf2.firebasestorage.app",
+            storageBucket: "sharebots-c6cf2.appspot.com",
             messagingSenderId: "94137535888",
-            appId: "1:94137535888:web:4460560c8173dc7e69f715",
-            measurementId: "G-4DXV8M8XF5"
+            appId: "1:94137535888:web:9c1ada079cc5afc369f715",
+            measurementId: "G-3RFWNDRYPM"
         };
 
         // Initialize Firebase
@@ -365,7 +386,9 @@
                     noBotsAvailable: 'Gösterilecek uygun bot yok.',
                     cancelBtn: 'İptal Et',
                     loading: 'Yükleniyor...',
-                    authFailed: 'Kimlik doğrulama başarısız. Lütfen backend yapılandırmanızı kontrol edin.',
+                    authFailed: 'Kimlik doğrulama başarısız. Lütfen tekrar deneyin.',
+                    loginTitle: 'Giriş Yap',
+                    loginDesc: 'Lütfen devam etmek için Telegram ile giriş yapın.',
                 },
                 en: {
                     pointsSuffix: 'Points',
@@ -397,17 +420,21 @@
                     noBotsAvailable: 'No eligible bots to display.',
                     cancelBtn: 'Cancel',
                     loading: 'Loading...',
-                    authFailed: 'Authentication failed. Please check your backend configuration.',
+                    authFailed: 'Authentication failed. Please try again.',
+                    loginTitle: 'Log In',
+                    loginDesc: 'Please log in with Telegram to continue.',
                 }
             };
 
             // --- STATE ---
-            let currentUser = null;
+            let currentUserData = null; // Holds Firestore data for the logged-in user
             let allEligibleBots = [];
             let currentLanguage = 'tr';
 
             // --- DOM ELEMENTS ---
             const loaderEl = document.getElementById('loader');
+            const appContainer = document.querySelector('.app-container');
+            const loginContainer = document.getElementById('login-container');
             const usernameEl = document.getElementById('username');
             const pointsEl = document.getElementById('points');
             const addBotInput = document.getElementById('add-bot-input');
@@ -424,7 +451,7 @@
             const cancelVisitBtn = document.getElementById('cancel-visit-btn');
 
             // --- VISIT BOT TASK STATE ---
-            let visitTask = { active: false, startTime: 0, chosenBot: null };
+            let visitTask = { active: false, startTime: 0, chosenBot: null, intervalId: null };
 
             // --- HELPER FUNCTIONS ---
             const showLoader = (show) => {
@@ -476,17 +503,24 @@
             };
 
             const updateUI = () => {
-                if (!currentUser) return;
+                const firebaseUser = auth.currentUser;
+                if (!firebaseUser || !currentUserData) {
+                    // Reset UI for logged-out state
+                    usernameEl.textContent = translations[currentLanguage].guest;
+                    pointsEl.textContent = `💰 0 ${translations[currentLanguage].pointsSuffix}`;
+                    return;
+                };
+
                 const T = translations[currentLanguage];
-                usernameEl.textContent = currentUser.username;
-                pointsEl.textContent = `💰 ${currentUser.points} ${T.pointsSuffix}`;
+                usernameEl.textContent = currentUserData.username;
+                pointsEl.textContent = `💰 ${currentUserData.points} ${T.pointsSuffix}`;
                 
-                addBotBtn.disabled = currentUser.points < 10;
-                addBotBtn.textContent = currentUser.points < 10 ? T.insufficientPoints : T.addBotBtn;
+                addBotBtn.disabled = currentUserData.points < 10;
+                addBotBtn.textContent = currentUserData.points < 10 ? T.insufficientPoints : T.addBotBtn;
 
                 const visitableBots = allEligibleBots.filter(bot => 
-                    bot.ownerId !== currentUser.id && 
-                    !currentUser.visitedBots.includes(bot.url)
+                    bot.ownerId !== firebaseUser.uid && 
+                    !currentUserData.visitedBots.includes(bot.url)
                 );
                 visitBotBtn.disabled = visitableBots.length === 0;
 
@@ -504,7 +538,6 @@
                     return;
                 }
                 
-                // Firestore 'in' query supports max 30 elements. Chunk if needed.
                 const CHUNK_SIZE = 30;
                 const botPromises = [];
                 for (let i = 0; i < eligibleOwnerIds.length; i += CHUNK_SIZE) {
@@ -520,61 +553,58 @@
                 });
             };
 
-            const initializeUserAndData = async () => {
+            const initializeUserData = async (firebaseUser) => {
                 showLoader(true);
-                const T = translations[currentLanguage];
-                try {
-                    await signInAnonymously(auth);
-                } catch (error) {
-                    console.error("Firebase Auth Error:", error);
-                    showToast(T.authFailed, 'error');
-                    showLoader(false);
-                    return;
-                }
-
-                let userId = 'guest';
-                let userName = T.guest;
-                
-                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                    userId = tg.initDataUnsafe.user.id.toString();
-                    userName = tg.initDataUnsafe.user.first_name || tg.initDataUnsafe.user.username || 'User';
-                }
-
-                const userRef = doc(db, "users", userId);
+                const userRef = doc(db, "users", firebaseUser.uid);
                 const userSnap = await getDoc(userRef);
 
                 if (userSnap.exists()) {
-                    currentUser = { id: userId, ...userSnap.data() };
+                    currentUserData = { id: firebaseUser.uid, ...userSnap.data() };
                 } else {
-                    currentUser = { id: userId, username: userName, points: 100, visitedBots: [] };
+                    let userName = 'User';
+                    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        userName = tg.initDataUnsafe.user.first_name || tg.initDataUnsafe.user.username || 'User';
+                    } else if (firebaseUser.displayName) {
+                        userName = firebaseUser.displayName;
+                    }
+                    
+                    currentUserData = { id: firebaseUser.uid, username: userName, points: 100, visitedBots: [] };
                     await setDoc(userRef, { username: userName, points: 100, visitedBots: [] });
                 }
                 
                 await fetchEligibleBots();
                 updateUI();
                 showLoader(false);
+                appContainer.style.display = 'flex';
+                loginContainer.style.display = 'none';
             };
+
 
             // --- CORE LOGIC ---
             const changePoints = async (amount) => {
-                if (!currentUser) {
-                    throw new Error("User not initialized");
+                if (!auth.currentUser) {
+                    showToast(translations[currentLanguage].authFailed, 'error');
+                    throw new Error("User not authenticated");
                 }
-                currentUser.points += amount;
-                const userRef = doc(db, "users", currentUser.id);
-                await updateDoc(userRef, { points: currentUser.points });
-                updateUI();
+                currentUserData.points += amount;
+                updateUI(); // Optimistic update
+                const userRef = doc(db, "users", auth.currentUser.uid);
+                await updateDoc(userRef, { points: currentUserData.points });
             };
 
             const handleAddBot = async () => {
                 const T = translations[currentLanguage];
+                if (!auth.currentUser) {
+                    showToast(T.authFailed, 'error');
+                    return;
+                }
                 if (addBotBtn.disabled) return;
                 const link = addBotInput.value.trim();
                 if (!link.startsWith('https://t.me/')) {
                     showToast(T.invalidBotLink, 'error');
                     return;
                 }
-                if (currentUser.points < 10) {
+                if (currentUserData.points < 10) {
                     showToast(T.notEnoughPointsError, 'error');
                     return;
                 }
@@ -582,7 +612,7 @@
                 showLoader(true);
                 try {
                     await runTransaction(db, async (transaction) => {
-                        const userRef = doc(db, "users", currentUser.id);
+                        const userRef = doc(db, "users", auth.currentUser.uid);
                         const userDoc = await transaction.get(userRef);
                         if (!userDoc.exists() || userDoc.data().points < 10) {
                             throw new Error(T.notEnoughPointsError);
@@ -592,10 +622,10 @@
                         transaction.update(userRef, { points: newPoints });
                         
                         const newBotRef = doc(collection(db, "bots"));
-                        transaction.set(newBotRef, { url: link, ownerId: currentUser.id });
+                        transaction.set(newBotRef, { url: link, ownerId: auth.currentUser.uid });
                     });
 
-                    currentUser.points -= 10;
+                    currentUserData.points -= 10;
                     addBotInput.value = '';
                     showToast(T.botAddedSuccess);
                     await fetchEligibleBots();
@@ -609,6 +639,10 @@
             };
             
             const handleWatchAd = () => {
+                if (!auth.currentUser) {
+                    showToast(translations[currentLanguage].authFailed, 'error');
+                    return;
+                }
                 const T = translations[currentLanguage];
                 watchAdBtn.disabled = true;
                 watchAdBtn.textContent = T.adLoading;
@@ -625,13 +659,15 @@
                     console.error("Ad error:", error);
                 }).finally(() => {
                     watchAdBtn.disabled = false;
-                    updateUI();
+                    // updateUI will be called by changePoints
                 });
             };
 
             const resetVisitTask = () => {
+                if (visitTask.intervalId) clearInterval(visitTask.intervalId);
+                timerEl.textContent = '5';
                 document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
-                visitTask = { active: false, startTime: 0, chosenBot: null };
+                visitTask = { active: false, startTime: 0, chosenBot: null, intervalId: null };
                 earnPointsCard.style.display = 'flex';
                 visitTaskCard.style.display = 'none';
             };
@@ -657,7 +693,7 @@
                     for (let i = 0; i < 4; i++) { await show_9448585(); }
 
                     await runTransaction(db, async (transaction) => {
-                        const visitorRef = doc(db, "users", currentUser.id);
+                        const visitorRef = doc(db, "users", auth.currentUser.uid);
                         const ownerRef = doc(db, "users", visitTask.chosenBot.ownerId);
 
                         const ownerDoc = await transaction.get(ownerRef);
@@ -665,12 +701,15 @@
                             throw new Error("Bot owner has insufficient points.");
                         }
 
-                        transaction.update(visitorRef, { points: currentUser.points + 10, visitedBots: arrayUnion(visitTask.chosenBot.url) });
                         transaction.update(ownerRef, { points: ownerDoc.data().points - 10 });
+                         // Fetch visitor doc to prevent race conditions with points
+                        const visitorDoc = await transaction.get(visitorRef);
+                        const newPoints = (visitorDoc.data().points || 0) + 10;
+                        transaction.update(visitorRef, { points: newPoints, visitedBots: arrayUnion(visitTask.chosenBot.url) });
                     });
 
-                    currentUser.points += 10;
-                    currentUser.visitedBots.push(visitTask.chosenBot.url);
+                    currentUserData.points += 10;
+                    currentUserData.visitedBots.push(visitTask.chosenBot.url);
                     showToast(T.visitTaskCompleted);
 
                 } catch (error) {
@@ -702,6 +741,20 @@
                 earnPointsCard.style.display = 'none';
                 visitTaskCard.style.display = 'flex';
                 visitBotLinkEl.href = bot.url;
+
+                let countdown = 5;
+                timerEl.textContent = countdown;
+                if (visitTask.intervalId) clearInterval(visitTask.intervalId); // Clear any old timers
+                visitTask.intervalId = setInterval(() => {
+                    countdown--;
+                    if (countdown >= 0) {
+                        timerEl.textContent = countdown;
+                    } else {
+                        timerEl.textContent = "✅";
+                        clearInterval(visitTask.intervalId);
+                    }
+                }, 1000);
+
                 visitBotLinkEl.addEventListener('click', () => {
                     document.addEventListener('visibilitychange', handleVisibilityChangeForVisit);
                 }, { once: true });
@@ -709,9 +762,13 @@
 
             const handleVisitBot = () => {
                 const T = translations[currentLanguage];
+                if (!auth.currentUser) {
+                    showToast(T.authFailed, 'error');
+                    return;
+                }
                 const visitableBots = allEligibleBots.filter(bot => 
-                    bot.ownerId !== currentUser.id && 
-                    !currentUser.visitedBots.includes(bot.url)
+                    bot.ownerId !== auth.currentUser.uid && 
+                    !currentUserData.visitedBots.includes(bot.url)
                 );
 
                 if (visitableBots.length === 0) {
@@ -733,10 +790,64 @@
             langTrBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('tr'); });
             langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
 
+            // --- AUTHENTICATION ---
+            const authFunctionUrl = "https://us-central1-sharebots-c6cf2.cloudfunctions.net/authTelegram";
+            
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    // User is signed in, get their data.
+                    initializeUserData(user);
+                } else {
+                    // User is signed out, show login UI.
+                    currentUserData = null;
+                    appContainer.style.display = 'none';
+                    loginContainer.style.display = 'block';
+                    showLoader(false);
+                }
+            });
+
+            const mainAuthFlow = async () => {
+                const params = new URLSearchParams(window.location.search);
+                try {
+                    // Case 1: Running inside Telegram Web App
+                    if (tg.initData) {
+                        showLoader(true);
+                        const response = await fetch(authFunctionUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ initData: tg.initData })
+                        });
+                        if (!response.ok) throw new Error(`Auth function failed with status ${response.status}`);
+                        const data = await response.json();
+                        if (!data.token) throw new Error("No token received");
+                        await signInWithCustomToken(auth, data.token);
+                    } 
+                    // Case 2: Redirect from web login widget
+                    else if (params.has("hash")) {
+                        showLoader(true);
+                        const response = await fetch(`${authFunctionUrl}?${params.toString()}`);
+                        if (!response.ok) throw new Error(`Auth function failed with status ${response.status}`);
+                        const data = await response.json();
+                        if (!data.token) throw new Error("No token received");
+                        await signInWithCustomToken(auth, data.token);
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                    // Case 3: Not authenticated on web, onAuthStateChanged will handle showing login.
+                    else {
+                         showLoader(false);
+                    }
+                } catch (err) {
+                    console.error("Authentication error:", err);
+                    showToast(translations[currentLanguage].authFailed, 'error');
+                    showLoader(false);
+                    // onAuthStateChanged will ensure login is shown
+                }
+            };
+            
             // --- INITIALIZATION ---
             const savedLang = localStorage.getItem('botPointsLang') || 'tr';
-            setLanguage(savedLang);
-            await initializeUserAndData();
+            setLanguage(savedLang); // Set language first for correct messages
+            await mainAuthFlow(); // Start auth process
         });
     </script>
 </body>
