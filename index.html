@@ -269,7 +269,7 @@
                 data-telegram-login="sharebots_bot"
                 data-size="large"
                 data-userpic="false"
-                data-auth-url="https://us-central1-sharebots-c6cf2.cloudfunctions.net/authTelegram"
+                data-auth-url="https://sharebots.onrender.com/authTelegram"
                 data-request-access="write">
         </script>
     </div>
@@ -791,7 +791,7 @@
             langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
 
             // --- AUTHENTICATION ---
-            const authFunctionUrl = "https://us-central1-sharebots-c6cf2.cloudfunctions.net/authTelegram";
+            const authFunctionUrl = "https://sharebots.onrender.com/authTelegram";
             
             onAuthStateChanged(auth, (user) => {
                 if (user) {
@@ -808,39 +808,47 @@
 
             const mainAuthFlow = async () => {
                 const params = new URLSearchParams(window.location.search);
+                const token = params.get('token');
+                const tg = window.Telegram.WebApp;
+
                 try {
-                    // Case 1: Running inside Telegram Web App
-                    if (tg.initData) {
+                    // Case 1: Token is in the URL after redirect from auth function.
+                    if (token) {
                         showLoader(true);
-                        const response = await fetch(authFunctionUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ initData: tg.initData })
-                        });
-                        if (!response.ok) throw new Error(`Auth function failed with status ${response.status}`);
-                        const data = await response.json();
-                        if (!data.token) throw new Error("No token received");
-                        await signInWithCustomToken(auth, data.token);
-                    } 
-                    // Case 2: Redirect from web login widget
-                    else if (params.has("hash")) {
-                        showLoader(true);
-                        const response = await fetch(`${authFunctionUrl}?${params.toString()}`);
-                        if (!response.ok) throw new Error(`Auth function failed with status ${response.status}`);
-                        const data = await response.json();
-                        if (!data.token) throw new Error("No token received");
-                        await signInWithCustomToken(auth, data.token);
+                        await signInWithCustomToken(auth, token);
+                        // Clean the URL to prevent re-using the token on refresh
                         window.history.replaceState({}, document.title, window.location.pathname);
+                        // onAuthStateChanged will handle the rest (hide loader, show app).
+                        return; // Auth process is done for this path.
                     }
-                    // Case 3: Not authenticated on web, onAuthStateChanged will handle showing login.
-                    else {
-                         showLoader(false);
+
+                    // Case 2: Running inside Telegram Web App for the first time (no token yet).
+                    // We need to redirect to the auth function to get a token.
+                    if (tg.initData && tg.initData.length > 0) {
+                        showLoader(true);
+                        // The entire page will be redirected to the auth function,
+                        // which will then redirect back here with a token.
+                        window.location.href = `${authFunctionUrl}?${tg.initData}`;
+                        return; // The script will stop execution here due to redirect.
                     }
+
+                    // Case 3: Not authenticated on web, no token, not in TG.
+                    // The onAuthStateChanged listener (already set up) will see no user is logged in
+                    // and will show the login container. The login widget will handle
+                    // redirecting to the auth function when clicked.
+                    // We can just ensure the loader is hidden if we reach this point.
+                    showLoader(false);
+
                 } catch (err) {
                     console.error("Authentication error:", err);
+                    // This catch is mainly for signInWithCustomToken failure (e.g., invalid token).
                     showToast(translations[currentLanguage].authFailed, 'error');
                     showLoader(false);
-                    // onAuthStateChanged will ensure login is shown
+                    // Clear broken token from URL
+                    if (params.has('token')) {
+                         window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                    // onAuthStateChanged will ensure login is shown.
                 }
             };
             
