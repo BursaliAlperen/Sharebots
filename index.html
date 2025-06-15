@@ -217,6 +217,29 @@
         }
     </style>
 </head>
+    <!-- Supabase CDN scriptini ekle -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+
+<script>
+  // Supabase client oluşturma
+  const supabaseUrl = 'https://tunljjyhphaxbiqjgnkq.supabase.co';
+  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Anon public key'in buraya
+  const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+  async function fetchUsers() {
+    const { data, error } = await supabase.from('kullanicilar').select('*');
+    if (error) {
+      console.error('Supabase error:', error);
+      return;
+    }
+    console.log('Kullanıcılar:', data);
+  }
+
+  // Sayfa yüklendiğinde çalıştır
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchUsers();
+  });
+</script>
 <body>
     <div class="app-container">
         <div class="header">
