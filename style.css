@@ -1,0 +1,269 @@
+:root {
+    /* Light Theme (Login View) */
+    --login-bg: #f0f2f5;
+    --login-card-bg: #ffffff;
+    --login-text: #1c1e21;
+    --login-subtle-text: #606770;
+
+    /* Dark Theme (App View) */
+    --app-bg: #121212;
+    --app-card-bg: #1e1e1e;
+    --app-button-bg: #333333;
+    --app-text: #e0e0e0;
+    --app-primary: #4a90e2;
+    --app-primary-hover: #5aa1f2;
+    --app-border: #2c2c2c;
+    --app-success: #28a745;
+    --app-error: #dc3545;
+}
+
+body {
+    margin: 0;
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background-color: var(--login-bg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    padding: 16px;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: contain;
+}
+
+/* --- Login View Styles --- */
+#login-view .container {
+    width: 100%;
+    max-width: 400px;
+}
+
+#login-view .card {
+    background-color: var(--login-card-bg);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+#login-view .card h1 {
+    color: var(--login-text);
+    font-size: 24px;
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+#login-view .card p {
+    color: var(--login-subtle-text);
+    font-size: 16px;
+    margin-bottom: 24px;
+}
+
+.telegram-login-container {
+    margin-top: 16px;
+}
+
+.widget-info {
+    font-size: 12px;
+    color: var(--login-subtle-text);
+    margin-top: 12px !important;
+    margin-bottom: 0 !important;
+    padding: 0 16px;
+}
+
+/* --- App View Styles --- */
+
+#app-view {
+    width: 100%;
+    color: var(--app-text);
+}
+
+#app-view .app-container {
+    max-width: 600px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+#app-view .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--app-card-bg);
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid var(--app-border);
+}
+
+#app-view .lang-switcher {
+    text-align: center;
+    padding-top: 15px;
+}
+#app-view .lang-switcher a {
+    color: var(--app-text);
+    text-decoration: none;
+    font-weight: 600;
+    padding: 0 4px;
+}
+#app-view .lang-switcher a.active {
+    color: var(--app-primary);
+    text-decoration: underline;
+}
+
+#app-view .user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+#app-view .points-info {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--app-primary);
+}
+
+#app-view .card {
+    background-color: var(--app-card-bg);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--app-border);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#app-view .card h2 {
+    margin: 0 0 5px 0;
+    font-size: 1.3em;
+    color: var(--app-text);
+}
+
+#app-view .card p {
+    margin: 0 0 10px 0;
+    color: #a0a0a0;
+    font-size: 0.9em;
+}
+
+#app-view .card a {
+    color: var(--app-primary);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+#app-view .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#app-view .input-field {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--app-bg);
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    color: var(--app-text);
+    font-size: 1em;
+    box-sizing: border-box;
+}
+
+#app-view .input-field::placeholder {
+    color: #777;
+}
+
+#app-view .btn {
+    padding: 15px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--app-button-bg);
+    color: var(--app-text);
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    text-align: center;
+}
+
+#app-view .btn:hover {
+    background-color: #444;
+}
+
+#app-view .btn:active {
+    transform: scale(0.98);
+}
+
+#app-view .btn.primary {
+    background-color: var(--app-primary);
+    color: white;
+}
+
+#app-view .btn.primary:hover {
+    background-color: var(--app-primary-hover);
+}
+
+#app-view .btn:disabled {
+    background-color: #2a2a2a;
+    color: #666;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+#app-view .button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#app-view #visit-task-card {
+    text-align: center;
+}
+
+#app-view #timer {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: var(--app-primary);
+    margin: 20px 0;
+}
+
+#app-view .bot-item {
+    background-color: var(--app-bg);
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid var(--app-border);
+    font-family: 'Courier New', Courier, monospace;
+    word-break: break-all;
+}
+
+.toast {
+    position: fixed;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 22px;
+    border-radius: 25px;
+    color: white;
+    font-weight: 500;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s, bottom 0.3s;
+    pointer-events: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    max-width: 90%;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.toast.show {
+    opacity: 1;
+    bottom: 30px;
+}
+
+.toast.success {
+    background-color: var(--app-success);
+}
+
+.toast.error {
+    background-color: var(--app-error);
+}
