@@ -94,43 +94,45 @@
             const token = params.get('token');
             const tg = window.Telegram?.WebApp;
             if (tg) {
-                try { tg.ready(); } catch(e) { console.warn('TG not available'); }
+                try { tg.ready(); } catch(e) { console.warn('TG WebApp is not available.'); }
             }
             
             if (token) {
-                // A token is in the URL, try to sign in
+                console.log("URL'de token bulundu, giriş yapılıyor...");
                 loader.style.display = 'block';
                 loginWidgetContainer.style.display = 'none';
+                errorMessage.style.display = 'none';
                 try {
                     await signInWithCustomToken(auth, token);
-                    // Success! Redirect to the main app.
+                    console.log("Giriş başarılı! Ana sayfaya yönlendiriliyor...");
                     window.location.href = "index(1).html";
                 } catch (error) {
-                    console.error("Firebase sign-in error:", error);
+                    console.error("Firebase ile giriş hatası:", error);
                     loader.style.display = 'none';
                     errorMessage.style.display = 'block';
-                    // Clean URL to avoid loops
+                    errorMessage.querySelector('p').textContent = `Kimlik doğrulama başarısız. Lütfen tekrar deneyin. Hata: ${error.code}`;
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
                 return;
             }
 
-            // No token, check auth state once on load
+            // Token yok, mevcut oturum kontrol ediliyor
             const unsubscribe = onAuthStateChanged(auth, (user) => {
-                unsubscribe(); // We only need this check once
+                unsubscribe(); // Sadece bir kez kontrol et
                 if (user) {
-                    // Already logged in (persistent session), go to app
+                    console.log("Aktif oturum bulundu, ana sayfaya yönlendiriliyor...");
                     window.location.href = "index(1).html";
                 } else {
-                    // Not logged in. Check if inside Telegram to start auth flow
+                    // Oturum yok. Telegram içinde mi kontrol et
                     if (tg && tg.initData && tg.initData.length > 0) {
+                        console.log("Telegram uygulaması içinde, kimlik doğrulama başlatılıyor...");
                         loader.style.display = 'block';
                         loginWidgetContainer.style.display = 'none';
-                        // Redirect to auth function which will redirect back here with a token
                         const authFunctionUrl = "https://sharebots.onrender.com/authTelegram";
                         window.location.href = `${authFunctionUrl}?${tg.initData}`;
                     } else {
-                        // Not in Telegram, not logged in. Show the login widget on a standard browser.
+                        // Tarayıcıda ve oturum yok. Giriş widget'ını göster
+                        console.log("Giriş yapılmamış, Telegram giriş widget'ı gösteriliyor.");
                         loader.style.display = 'none';
                         loginWidgetContainer.style.display = 'block';
                     }
