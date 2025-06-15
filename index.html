@@ -1,8 +1,32 @@
+<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Puan Kazan</title>
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-analytics.js";
+        // TODO: Add SDKs for Firebase products that you want to use
+        // https://firebase.google.com/docs/web/setup#available-libraries
+
+        // Your web app's Firebase configuration
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+            apiKey: "AIzaSyA--y48rZEOG9jc50icr7pLgQgxeNYQry4",
+            authDomain: "sharebots-c6cf2.firebaseapp.com",
+            projectId: "sharebots-c6cf2",
+            storageBucket: "sharebots-c6cf2.firebasestorage.app",
+            messagingSenderId: "94137535888",
+            appId: "1:94137535888:web:9c1ada079cc5afc369f715",
+            measurementId: "G-3RFWNDRYPM"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+    </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src='https://libtl.com/sdk.js' data-zone='9448585' data-sdk='show_9448585'></script>
     <style>
@@ -247,8 +271,7 @@
             <h2 data-key="addedBotsTitle">Eklenen Botlar</h2>
             <p data-key="addedBotsDesc">Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.</p>
             <div id="bot-list-container">
-                <!-- Bots will be dynamically inserted here -->
-            </div>
+                </div>
         </div>
 
         <div class="card">
@@ -479,200 +502,4 @@
                 visitBotBtn.disabled = eligibleBotsForVisit.length === 0;
 
                 renderBotList();
-            };
-
-            const showToast = (message, type = 'success') => {
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                toast.textContent = message;
-                document.body.appendChild(toast);
-
-                setTimeout(() => toast.classList.add('show'), 10);
-                setTimeout(() => {
-                    toast.classList.remove('show');
-                    setTimeout(() => {
-                        if (document.body.contains(toast)) {
-                           document.body.removeChild(toast);
-                        }
-                    }, 300);
-                }, 3000);
-            };
-
-            const changePoints = (amount) => {
-                currentUser.points += amount;
-                updateUI();
-            };
-
-            const handleAddBot = () => {
-                const T = translations[currentLanguage];
-                if (addBotBtn.disabled) return;
-                const link = addBotInput.value.trim();
-                if (!link.startsWith('https://t.me/')) {
-                    showToast(T.invalidBotLink, 'error');
-                    return;
-                }
-
-                if (currentUser.points < 10) {
-                    showToast(T.notEnoughPointsError, 'error');
-                    return;
-                }
-
-                changePoints(-10);
-                appData.botLinks.push({ url: link, owner: currentUser.id });
-                saveState();
-                updateUI();
-                addBotInput.value = '';
-                showToast(T.botAddedSuccess);
-            };
-
-            const handleWatchAd = () => {
-                const T = translations[currentLanguage];
-                watchAdBtn.disabled = true;
-                watchAdBtn.textContent = T.adLoading;
-
-                show_9448585().then(() => {
-                    changePoints(10);
-                    saveState();
-                    showToast(T.adWatchedSuccess);
-                }).catch((error) => {
-                    showToast(T.adError, 'error');
-                    console.error("Ad error:", error);
-                }).finally(() => {
-                    watchAdBtn.disabled = false;
-                    updateUI();
-                });
-            };
-
-            const resetVisitTask = () => {
-                document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
-                visitTask.active = false;
-                visitTask.chosenBot = null;
-                visitTask.startTime = 0;
-                
-                earnPointsCard.style.display = 'flex';
-                visitTaskCard.style.display = 'none';
-                timerEl.style.display = 'block';
-            };
-
-            const handleVisitFail = async () => {
-                const T = translations[currentLanguage];
-                showToast(T.visitTaskFail, 'error');
-
-                try {
-                    for (let i = 0; i < 4; i++) {
-                        await show_9448585();
-                    }
-                } catch (error) {
-                    console.error('Ad error during visit task (fail case):', error);
-                    showToast(T.adErrorDuringVisit, 'error');
-                } finally {
-                    resetVisitTask();
-                    updateUI();
-                }
-            };
-
-            const handleVisitSuccess = async () => {
-                const T = translations[currentLanguage];
-                showToast(T.visitTaskSuccess, 'info');
-
-                try {
-                    for (let i = 0; i < 4; i++) {
-                        await show_9448585();
-                    }
-
-                    // If all ads were shown successfully:
-                    changePoints(10);
-                    const owner = appData.users[visitTask.chosenBot.owner];
-                    if (owner) {
-                        owner.points -= 10;
-                    }
-                    if (!appData.users[currentUser.id].visitedBots) {
-                        appData.users[currentUser.id].visitedBots = [];
-                    }
-                    appData.users[currentUser.id].visitedBots.push(visitTask.chosenBot.url);
-                    saveState();
-                    showToast(T.visitTaskCompleted);
-
-                } catch (error) {
-                    console.error('Ad error during visit task:', error);
-                    showToast(T.adErrorDuringVisit, 'error');
-                } finally {
-                    resetVisitTask();
-                    updateUI();
-                }
-            };
-
-            const handleVisibilityChangeForVisit = () => {
-                if (!visitTask.active) return;
-
-                if (document.visibilityState === 'hidden' && visitTask.startTime === 0) {
-                    // User has left the page after clicking the link
-                    visitTask.startTime = Date.now();
-                } else if (document.visibilityState === 'visible' && visitTask.startTime > 0) {
-                    // User has returned
-                    const elapsed = Date.now() - visitTask.startTime;
-                    
-                    document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
-                    
-                    if (elapsed >= 5000) {
-                        handleVisitSuccess();
-                    } else {
-                        handleVisitFail();
-                    }
-                }
-            };
-            
-            const startVisitTask = (bot) => {
-                visitTask.active = true;
-                visitTask.chosenBot = bot;
-                visitTask.startTime = 0;
-
-                earnPointsCard.style.display = 'none';
-                visitTaskCard.style.display = 'flex';
-                timerEl.style.display = 'none'; // Hide the timer element as it's not used in this flow
-                visitBotLinkEl.href = bot.url;
-
-                // Add the visibility listener only after the user clicks the link
-                visitBotLinkEl.addEventListener('click', () => {
-                    document.addEventListener('visibilitychange', handleVisibilityChangeForVisit);
-                }, { once: true });
-            };
-
-            const handleVisitBot = () => {
-                const T = translations[currentLanguage];
-                const visitedBots = appData.users[currentUser.id].visitedBots || [];
-                const eligibleBots = appData.botLinks.filter(bot => 
-                    bot.owner !== currentUser.id && 
-                    appData.users[bot.owner] && 
-                    appData.users[bot.owner].points >= 10 &&
-                    !visitedBots.includes(bot.url)
-                );
-
-                if (eligibleBots.length === 0) {
-                    showToast(T.noBotsToVisit, 'info');
-                    return;
-                }
-
-                const chosenBot = eligibleBots[Math.floor(Math.random() * eligibleBots.length)];
-                startVisitTask(chosenBot);
-            };
-
-            // --- EVENT LISTENERS ---
-            addBotBtn.addEventListener('click', handleAddBot);
-            watchAdBtn.addEventListener('click', handleWatchAd);
-            visitBotBtn.addEventListener('click', handleVisitBot);
-            cancelVisitBtn.addEventListener('click', () => {
-                resetVisitTask();
-                updateUI();
-            });
-            langTrBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('tr'); });
-            langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
-
-            // --- INITIALIZATION ---
-            loadState();
-            setLanguage(currentLanguage);
-
-        });
-    </script>
-</body>
-</html>
+       
