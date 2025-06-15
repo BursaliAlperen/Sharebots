@@ -5,7 +5,6 @@
     <title>Puan Kazan</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src='https://libtl.com/sdk.js' data-zone='9448585' data-sdk='show_9448585'></script>
-    <script src="/websim/websim-socket.js"></script>
     <style>
         :root {
             --bg-color: #121212;
@@ -44,20 +43,6 @@
             padding: 15px;
             border-radius: 12px;
             border: 1px solid var(--border-color);
-        }
-
-        .status-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background-color: var(--error-color); /* Default to red */
-            margin-right: 8px;
-            transition: background-color 0.5s;
-            flex-shrink: 0;
-        }
-        .status-dot.connected {
-            background-color: var(--success-color);
         }
 
         .lang-switcher {
@@ -236,7 +221,6 @@
     <div class="app-container">
         <div class="header">
             <div class="user-info">
-                <span id="connection-status" title="Bağlantı Durumu" class="status-dot"></span>
                 <span>👤</span>
                 <span id="username">Guest</span>
             </div>
@@ -253,7 +237,7 @@
 
         <div id="visit-task-card" class="card">
             <h2 data-key="visitTaskTitle">Bot Ziyareti Görevi</h2>
-            <p data-key="visitTaskDesc">Görevi tamamlamak için linke tıklayın ve botu ziyaret edin. Ödülü almak için en az 5 saniye sonra bu sayfaya geri dönmelisiniz. Pencereden ayrılırsanız görev iptal olur.</p>
+            <p data-key="visitTaskDesc">Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.</p>
             <a id="visit-bot-link" href="#" target="_blank" rel="noopener noreferrer" data-key="visitBotLink">Bot Linki</a>
             <div id="timer">5</div>
             <button id="cancel-visit-btn" class="btn" data-key="cancelBtn" style="margin-top: 10px;">İptal Et</button>
@@ -277,32 +261,20 @@
         </div>
     </div>
 
-    <div id="telegram-error" class="card" style="display: none; text-align: center; background-color: var(--error-color); margin: 20px auto; max-width: 600px;">
-        <h2 data-key="telegramErrorTitle" style="color: white;">Erişim Hatası</h2>
-        <p data-key="telegramErrorDesc" style="color: #f0f0f0;">Bu uygulama yalnızca Telegram uygulaması içinden başlatıldığında düzgün çalışır.</p>
-    </div>
-
     <div class="lang-switcher">
         <a href="#" id="lang-tr" class="active">TR</a> | <a href="#" id="lang-en">EN</a>
     </div>
 
     <script>
-        /*
-            ÖNEMLİ NOT:
-            Bu uygulama, verileri canlı ve tüm kullanıcılar arasında senkronize tutmak için
-            WebsimSocket adında bir simülasyon aracı kullanır. Bu, birisi bot eklediğinde
-            herkesin anında görmesini sağlar. Puanlarınız ve botlarınız bu "canlı veritabanına"
-            kaydedilir.
-
-            Bu kodu kendi web sitenize entegre ettiğinizde, 'websim-socket.js' dosyasının
-            düzgün çalıştığından veya bu işlevsellik için Firebase, Supabase gibi
-            gerçek zamanlı bir veritabanı kullandığınızdan emin olmalısınız.
-            Tarayıcı belleği (localStorage) tek başına diğer kullanıcıların
-            değişikliklerini canlı olarak göstermeye yetmez.
-        */
-        const room = new WebsimSocket();
-
         document.addEventListener('DOMContentLoaded', () => {
+            const tg = window.Telegram.WebApp;
+            try {
+                tg.ready();
+                tg.expand();
+            } catch (e) {
+                console.warn("Telegram WebApp script not found or failed. Running in browser mode.");
+            }
+
             // --- TRANSLATIONS ---
             const translations = {
                 tr: {
@@ -312,7 +284,7 @@
                     watchAdBtn: '🎬 Reklam İzle (+10 Puan)',
                     visitBotBtn: '🎯 Bot Ziyaret Et (+10 Puan)',
                     visitTaskTitle: 'Bot Ziyareti Görevi',
-                    visitTaskDesc: 'Görevi tamamlamak için linke tıklayın ve botu ziyaret edin. Ödülü almak için en az 5 saniye sonra bu sayfaya geri dönmelisiniz. Pencereden ayrılırsanız görev iptal olur.',
+                    visitTaskDesc: 'Görevi tamamlamak için linke tıklayın, botu ziyaret edin ve en az 5 saniye sonra bu sayfaya geri dönün. Pencereden ayrılırsanız görev iptal olur.',
                     visitBotLink: 'Bot Linki',
                     addYourBotTitle: 'Botunu Ekle',
                     addYourBotDesc: 'Botunuzun referans linkini ekleyerek başkalarının ziyaret etmesini sağlayın. Bu işlem 10 puana mal olur.',
@@ -320,11 +292,10 @@
                     addBotBtn: '➕ Bot Ekle (-10 Puan)',
                     insufficientPoints: 'Yetersiz Puan',
                     adLoading: 'Reklam Yükleniyor...',
-                    noBotsToVisit: 'Şu anda ziyaret edilecek bot yok.',
+                    noBotsToVisit: 'Ziyaret edilecek uygun bot bulunmuyor.',
                     invalidBotLink: 'Lütfen geçerli bir Telegram bot linki girin (https://t.me/...).',
                     notEnoughPointsError: 'Yeterli puanınız yok.',
                     botAddedSuccess: 'Bot başarıyla eklendi!',
-                    botAddError: 'Bot eklenirken hata oluştu.',
                     adWatchedSuccess: 'Reklam izlendi! +10 Puan kazandınız.',
                     adError: 'Reklam gösterilemedi. Tekrar deneyin.',
                     visitTaskFail: 'Çok erken geri döndünüz. Görev başarısız oldu.',
@@ -335,8 +306,6 @@
                     addedBotsDesc: 'Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.',
                     noBotsAvailable: 'Gösterilecek uygun bot yok.',
                     cancelBtn: 'İptal Et',
-                    telegramErrorTitle: 'Erişim Hatası',
-                    telegramErrorDesc: 'Bu uygulama yalnızca Telegram uygulaması içinden başlatıldığında düzgün çalışır.',
                 },
                 en: {
                     pointsSuffix: 'Points',
@@ -345,7 +314,7 @@
                     watchAdBtn: '🎬 Watch Ad (+10 Points)',
                     visitBotBtn: '🎯 Visit Bot (+10 Points)',
                     visitTaskTitle: 'Bot Visit Task',
-                    visitTaskDesc: 'To complete the task, click the link and visit the bot. To get the reward, you must return to this page after at least 5 seconds. The task will be canceled if you switch windows.',
+                    visitTaskDesc: 'To complete the task, click the link, visit the bot, and return to this page after at least 5 seconds. The task will be canceled if you switch windows.',
                     visitBotLink: 'Bot Link',
                     addYourBotTitle: 'Add Your Bot',
                     addYourBotDesc: 'Add your bot\'s referral link for others to visit. This costs 10 points.',
@@ -353,11 +322,10 @@
                     addBotBtn: '➕ Add Bot (-10 Points)',
                     insufficientPoints: 'Insufficient Points',
                     adLoading: 'Loading Ad...',
-                    noBotsToVisit: 'There are no bots to visit right now.',
+                    noBotsToVisit: 'No eligible bots available to visit.',
                     invalidBotLink: 'Please enter a valid Telegram bot link (https://t.me/...).',
                     notEnoughPointsError: 'You do not have enough points.',
                     botAddedSuccess: 'Bot added successfully!',
-                    botAddError: 'Error adding bot.',
                     adWatchedSuccess: 'Ad watched! You earned +10 Points.',
                     adError: 'Could not show ad. Please try again.',
                     visitTaskFail: 'You returned too soon. Task failed.',
@@ -368,20 +336,15 @@
                     addedBotsDesc: 'Only bots whose owners have enough points (>=10) are listed here.',
                     noBotsAvailable: 'No eligible bots to display.',
                     cancelBtn: 'Cancel',
-                    telegramErrorTitle: 'Access Error',
-                    telegramErrorDesc: 'This application only works correctly when launched from within the Telegram app.',
                 }
             };
 
             // --- STATE ---
-            let allUsers = [];
-            let allBotLinks = [];
-            let currentUser = null; // Websim user { id, username }
-            let currentUserData = null; // Our user data from the DB
+            let appData = {}; // Holds { users: {}, botLinks: [] }
+            let currentUser = { id: 'guest', username: 'Guest', points: 0 };
             let currentLanguage = 'tr';
 
             // --- DOM ELEMENTS ---
-            const connectionStatusEl = document.getElementById('connection-status');
             const usernameEl = document.getElementById('username');
             const pointsEl = document.getElementById('points');
             const addBotInput = document.getElementById('add-bot-input');
@@ -396,7 +359,6 @@
             const langTrBtn = document.getElementById('lang-tr');
             const langEnBtn = document.getElementById('lang-en');
             const cancelVisitBtn = document.getElementById('cancel-visit-btn');
-            const telegramErrorEl = document.getElementById('telegram-error');
 
             // --- VISIT BOT TASK STATE ---
             let visitTask = {
@@ -406,6 +368,52 @@
             };
 
             // --- FUNCTIONS ---
+            const loadState = () => {
+                currentLanguage = localStorage.getItem('botPointsLang') || 'tr';
+
+                const savedData = JSON.parse(localStorage.getItem('botPointsAppData'));
+                if (savedData && savedData.users) {
+                    appData = savedData;
+                } else {
+                    appData = {
+                        users: { 'system': { username: 'System', points: 999999 } },
+                        botLinks: [
+                            { url: 'https://t.me/SpamBot', owner: 'system' },
+                            { url: 'https://t.me/Stickers', owner: 'system' }
+                        ]
+                    };
+                }
+
+                let userId = 'guest';
+                let userName = translations[currentLanguage].guest;
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                    userId = tg.initDataUnsafe.user.id.toString();
+                    userName = tg.initDataUnsafe.user.first_name || tg.initDataUnsafe.user.username || 'User';
+                }
+
+                if (!appData.users[userId]) {
+                    appData.users[userId] = { username: userName, points: 100, visitedBots: [] };
+                } else if (!appData.users[userId].visitedBots) {
+                    // For existing users from old state, ensure visitedBots exists
+                    appData.users[userId].visitedBots = [];
+                }
+                
+                currentUser = {
+                    id: userId,
+                    username: appData.users[userId].username,
+                    points: appData.users[userId].points
+                };
+
+                saveState();
+            };
+
+            const saveState = () => {
+                if (appData.users[currentUser.id]) {
+                    appData.users[currentUser.id].points = currentUser.points;
+                }
+                localStorage.setItem('botPointsAppData', JSON.stringify(appData));
+            };
+
             const setLanguage = (lang) => {
                 currentLanguage = lang;
                 localStorage.setItem('botPointsLang', lang);
@@ -430,10 +438,7 @@
                 const T = translations[currentLanguage];
                 botListContainer.innerHTML = ''; 
 
-                const userPointsMap = new Map(allUsers.map(u => [u.userId, u.points]));
-                const eligibleBots = allBotLinks.filter(bot => (userPointsMap.get(bot.ownerId) || 0) >= 10);
-                
-                document.getElementById('bot-list-card').style.display = eligibleBots.length > 0 ? 'block' : 'none';
+                const eligibleBots = appData.botLinks.filter(bot => appData.users[bot.owner] && appData.users[bot.owner].points >= 10);
 
                 if (eligibleBots.length === 0) {
                     botListContainer.innerHTML = `<p style="font-size:0.9em; text-align:center;">${T.noBotsAvailable || ''}</p>`;
@@ -451,23 +456,27 @@
             const updateUI = () => {
                 const T = translations[currentLanguage];
                 
-                usernameEl.textContent = currentUserData ? currentUserData.username : (currentUser ? currentUser.username : T.guest);
-                pointsEl.textContent = `💰 ${currentUserData ? currentUserData.points : 0} ${T.pointsSuffix}`;
+                usernameEl.textContent = currentUser.username;
+                pointsEl.textContent = `💰 ${currentUser.points} ${T.pointsSuffix}`;
                 
                 watchAdBtn.textContent = T.watchAdBtn;
                 visitBotBtn.textContent = T.visitBotBtn;
 
-                const userLoaded = !!currentUserData;
-
-                watchAdBtn.disabled = !userLoaded;
-                visitBotBtn.disabled = !userLoaded;
-
-                addBotBtn.disabled = !userLoaded || currentUserData.points < 10;
-                if (!userLoaded || currentUserData.points < 10) {
+                addBotBtn.disabled = currentUser.points < 10;
+                if (currentUser.points < 10) {
                     addBotBtn.textContent = T.insufficientPoints;
                 } else {
                     addBotBtn.textContent = T.addBotBtn;
                 }
+
+                const visitedBots = appData.users[currentUser.id]?.visitedBots || [];
+                const eligibleBotsForVisit = appData.botLinks.filter(bot => 
+                    bot.owner !== currentUser.id && 
+                    appData.users[bot.owner] && 
+                    appData.users[bot.owner].points >= 10 &&
+                    !visitedBots.includes(bot.url)
+                );
+                visitBotBtn.disabled = eligibleBotsForVisit.length === 0;
 
                 renderBotList();
             };
@@ -489,58 +498,48 @@
                 }, 3000);
             };
 
-            const handleAddBot = async () => {
-                const T = translations[currentLanguage];
-                if (addBotBtn.disabled || !currentUserData) return;
+            const changePoints = (amount) => {
+                currentUser.points += amount;
+                updateUI();
+            };
 
+            const handleAddBot = () => {
+                const T = translations[currentLanguage];
+                if (addBotBtn.disabled) return;
                 const link = addBotInput.value.trim();
                 if (!link.startsWith('https://t.me/')) {
                     showToast(T.invalidBotLink, 'error');
                     return;
                 }
 
-                const latestUserData = room.collection('users_v3').getList().find(u => u.id === currentUserData.id);
-
-                if (!latestUserData || latestUserData.points < 10) {
+                if (currentUser.points < 10) {
                     showToast(T.notEnoughPointsError, 'error');
                     return;
                 }
-                
-                addBotBtn.disabled = true;
 
-                try {
-                    await room.collection('users_v3').update(latestUserData.id, { points: latestUserData.points - 10 });
-                    await room.collection('botLinks_v3').create({ url: link, ownerId: currentUser.id });
-                    addBotInput.value = '';
-                    showToast(T.botAddedSuccess);
-                } catch(e) {
-                    console.error("Error adding bot:", e);
-                    showToast(T.botAddError, 'error');
-                    // Subscriptions will eventually update the UI to the correct state.
-                }
+                changePoints(-10);
+                appData.botLinks.push({ url: link, owner: currentUser.id });
+                saveState();
+                updateUI();
+                addBotInput.value = '';
+                showToast(T.botAddedSuccess);
             };
 
             const handleWatchAd = () => {
                 const T = translations[currentLanguage];
-                if (!currentUserData) return;
-
                 watchAdBtn.disabled = true;
                 watchAdBtn.textContent = T.adLoading;
 
-                show_9448585().then(async () => {
-                    const latestUserData = room.collection('users_v3').getList().find(u => u.id === currentUserData.id);
-                    if (latestUserData) {
-                        await room.collection('users_v3').update(latestUserData.id, { points: latestUserData.points + 10 });
-                        showToast(T.adWatchedSuccess);
-                    } else {
-                        console.error("Could not find user to update points after ad.");
-                        showToast(T.adError, 'error');
-                    }
+                show_9448585().then(() => {
+                    changePoints(10);
+                    saveState();
+                    showToast(T.adWatchedSuccess);
                 }).catch((error) => {
                     showToast(T.adError, 'error');
                     console.error("Ad error:", error);
                 }).finally(() => {
-                    updateUI(); // Resets button text/state regardless of outcome
+                    watchAdBtn.disabled = false;
+                    updateUI();
                 });
             };
 
@@ -558,14 +557,17 @@
             const handleVisitFail = async () => {
                 const T = translations[currentLanguage];
                 showToast(T.visitTaskFail, 'error');
-                resetVisitTask();
-                updateUI();
+
                 try {
                     for (let i = 0; i < 4; i++) {
                         await show_9448585();
                     }
                 } catch (error) {
                     console.error('Ad error during visit task (fail case):', error);
+                    showToast(T.adErrorDuringVisit, 'error');
+                } finally {
+                    resetVisitTask();
+                    updateUI();
                 }
             };
 
@@ -578,26 +580,21 @@
                         await show_9448585();
                     }
 
-                    if(currentUserData && visitTask.chosenBot) {
-                        const latestAllUsers = room.collection('users_v3').getList();
-                        const ownerRecord = latestAllUsers.find(u => u.userId === visitTask.chosenBot.ownerId);
-
-                        if (ownerRecord && ownerRecord.points >= 10) {
-                            await room.collection('users_v3').update(ownerRecord.id, { points: ownerRecord.points - 10 });
-                        }
-
-                        const latestCurrentUserData = latestAllUsers.find(u => u.id === currentUserData.id);
-                        if(latestCurrentUserData) {
-                            const updatedVisitedBots = [...(latestCurrentUserData.visitedBots || []), visitTask.chosenBot.url];
-                            await room.collection('users_v3').update(latestCurrentUserData.id, { 
-                                points: latestCurrentUserData.points + 10,
-                                visitedBots: updatedVisitedBots
-                            });
-                            showToast(T.visitTaskCompleted);
-                        }
+                    // If all ads were shown successfully:
+                    changePoints(10);
+                    const owner = appData.users[visitTask.chosenBot.owner];
+                    if (owner) {
+                        owner.points -= 10;
                     }
+                    if (!appData.users[currentUser.id].visitedBots) {
+                        appData.users[currentUser.id].visitedBots = [];
+                    }
+                    appData.users[currentUser.id].visitedBots.push(visitTask.chosenBot.url);
+                    saveState();
+                    showToast(T.visitTaskCompleted);
+
                 } catch (error) {
-                    console.error('Ad error or DB error during visit task:', error);
+                    console.error('Ad error during visit task:', error);
                     showToast(T.adErrorDuringVisit, 'error');
                 } finally {
                     resetVisitTask();
@@ -609,9 +606,12 @@
                 if (!visitTask.active) return;
 
                 if (document.visibilityState === 'hidden' && visitTask.startTime === 0) {
+                    // User has left the page after clicking the link
                     visitTask.startTime = Date.now();
                 } else if (document.visibilityState === 'visible' && visitTask.startTime > 0) {
+                    // User has returned
                     const elapsed = Date.now() - visitTask.startTime;
+                    
                     document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
                     
                     if (elapsed >= 5000) {
@@ -629,9 +629,10 @@
 
                 earnPointsCard.style.display = 'none';
                 visitTaskCard.style.display = 'flex';
-                timerEl.style.display = 'none';
+                timerEl.style.display = 'none'; // Hide the timer element as it's not used in this flow
                 visitBotLinkEl.href = bot.url;
 
+                // Add the visibility listener only after the user clicks the link
                 visitBotLinkEl.addEventListener('click', () => {
                     document.addEventListener('visibilitychange', handleVisibilityChangeForVisit);
                 }, { once: true });
@@ -639,14 +640,11 @@
 
             const handleVisitBot = () => {
                 const T = translations[currentLanguage];
-                if (!currentUserData) return;
-
-                const visitedBots = currentUserData.visitedBots || [];
-                const userPointsMap = new Map(allUsers.map(u => [u.userId, u.points]));
-
-                const eligibleBots = allBotLinks.filter(bot => 
-                    bot.ownerId !== currentUser.id && 
-                    (userPointsMap.get(bot.ownerId) || 0) >= 10 &&
+                const visitedBots = appData.users[currentUser.id].visitedBots || [];
+                const eligibleBots = appData.botLinks.filter(bot => 
+                    bot.owner !== currentUser.id && 
+                    appData.users[bot.owner] && 
+                    appData.users[bot.owner].points >= 10 &&
                     !visitedBots.includes(bot.url)
                 );
 
@@ -671,78 +669,9 @@
             langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
 
             // --- INITIALIZATION ---
-            const initialize = async () => {
-                const T = translations[currentLanguage];
-                let userId = null;
-                let username = null;
-                const tg = window.Telegram.WebApp;
+            loadState();
+            setLanguage(currentLanguage);
 
-                try {
-                    tg.ready();
-                    tg.expand();
-                    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                        userId = `tg-${tg.initDataUnsafe.user.id}`;
-                        username = tg.initDataUnsafe.user.username || `${tg.initDataUnsafe.user.first_name} ${tg.initDataUnsafe.user.last_name || ''}`.trim();
-                        console.log('Using Telegram user:', username, userId);
-                    }
-                } catch (e) {
-                    console.warn("Telegram WebApp not available. This is expected outside of Telegram.");
-                }
-
-                if (!userId) {
-                    console.error("Could not get Telegram user data. App will not function.");
-                    document.querySelector('.app-container').style.display = 'none';
-                    telegramErrorEl.style.display = 'block';
-                    const savedLang = localStorage.getItem('botPointsLang') || 'tr';
-                    setLanguage(savedLang); // To translate the error message
-                    return;
-                }
-                
-                currentUser = { id: userId, username: username };
-
-                room.collection('users_v3').subscribe(users => {
-                    connectionStatusEl.classList.add('connected');
-                    connectionStatusEl.title = "Bağlantı kuruldu!";
-
-                    allUsers = users.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-                    
-                    const userRecord = allUsers.find(u => u.userId === currentUser.id);
-
-                    if (!userRecord) {
-                        // Debounce creation to avoid race conditions on first load
-                        setTimeout(() => {
-                            // Check again with the latest user list
-                            const latestUsers = room.collection('users_v3').getList();
-                            if (!latestUsers.some(u => u.userId === currentUser.id)) {
-                                room.collection('users_v3').create({
-                                    userId: currentUser.id,
-                                    username: currentUser.username,
-                                    points: 100,
-                                    visitedBots: []
-                                });
-                            }
-                        }, 500 + Math.random() * 500);
-                    } else {
-                        // If username in DB is different from current one (e.g., from Telegram), update it.
-                        // Don't update if the new username is "Guest", as that might be a fallback.
-                        if (userRecord.username !== currentUser.username && currentUser.username !== T.guest) {
-                           room.collection('users_v3').update(userRecord.id, { username: currentUser.username });
-                        }
-                        currentUserData = userRecord;
-                    }
-                    updateUI();
-                });
-
-                room.collection('botLinks_v3').subscribe(botLinks => {
-                    allBotLinks = botLinks.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // newest first
-                    updateUI();
-                });
-
-                const savedLang = localStorage.getItem('botPointsLang') || 'tr';
-                setLanguage(savedLang);
-            };
-            
-            initialize();
         });
     </script>
 </body>
