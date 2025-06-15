@@ -30,7 +30,7 @@
         .app-container {
             max-width: 600px;
             margin: 0 auto;
-            display: flex;
+            display: none; /* Hide by default, show after auth */
             flex-direction: column;
             gap: 20px;
         }
@@ -215,9 +215,65 @@
         .toast.error {
             background-color: var(--error-color);
         }
+        
+        #login-container {
+            display: none; /* Shown for non-authed users on web */
+            text-align: center;
+            padding: 50px 15px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            color: white;
+            font-size: 1.2em;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #fff;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
+    <div id="loader" class="loader-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <span data-key="loading">Yükleniyor...</span>
+    </div>
+
+    <div id="login-container">
+        <h2 data-key="loginTitle">Giriş Yap</h2>
+        <p data-key="loginDesc">Lütfen devam etmek için Telegram ile giriş yapın.</p>
+        <script async src="https://telegram.org/js/telegram-widget.js?22"
+                data-telegram-login="sharebots_bot"
+                data-size="large"
+                data-userpic="false"
+                data-auth-url="https://sharebots.onrender.com/authTelegram"
+                data-request-access="write">
+        </script>
+    </div>
+
     <div class="app-container">
         <div class="header">
             <div class="user-info">
@@ -243,7 +299,7 @@
             <button id="cancel-visit-btn" class="btn" data-key="cancelBtn" style="margin-top: 10px;">İptal Et</button>
         </div>
 
-        <div id="bot-list-card" class="card" style="display: none;">
+        <div id="bot-list-card" class="card">
             <h2 data-key="addedBotsTitle">Eklenen Botlar</h2>
             <p data-key="addedBotsDesc">Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.</p>
             <div id="bot-list-container">
@@ -251,7 +307,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div id="add-bot-card" class="card">
             <h2 data-key="addYourBotTitle">Botunu Ekle</h2>
             <p data-key="addYourBotDesc">Botunuzun referans linkini ekleyerek başkalarının ziyaret etmesini sağlayın. Bu işlem 10 puana mal olur.</p>
             <div class="input-group">
@@ -265,8 +321,33 @@
         <a href="#" id="lang-tr" class="active">TR</a> | <a href="#" id="lang-en">EN</a>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
+    <div id="toast-container"></div>
+
+    <script type="module">
+        // Import Firebase and other functions
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-analytics.js";
+        import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, addDoc, getDocs, query, where, arrayUnion, runTransaction, writeBatch } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyA--y48rZEOG9jc50icr7pLgQgxeNYQry4",
+            authDomain: "sharebots-c6cf2.firebaseapp.com",
+            projectId: "sharebots-c6cf2",
+            storageBucket: "sharebots-c6cf2.appspot.com",
+            messagingSenderId: "94137535888",
+            appId: "1:94137535888:web:9c1ada079cc5afc369f715",
+            measurementId: "G-3RFWNDRYPM"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const analytics = getAnalytics(app);
+
+        document.addEventListener('DOMContentLoaded', async () => {
             const tg = window.Telegram.WebApp;
             try {
                 tg.ready();
@@ -306,6 +387,12 @@
                     addedBotsDesc: 'Sadece sahiplerinin yeterli puanı (>=10) olan botlar burada listelenir.',
                     noBotsAvailable: 'Gösterilecek uygun bot yok.',
                     cancelBtn: 'İptal Et',
+                    loading: 'Yükleniyor...',
+                    authFailed: 'Kimlik doğrulama başarısız. Lütfen tekrar deneyin.',
+                    loginTitle: 'Giriş Yap',
+                    loginDesc: 'Lütfen devam etmek için Telegram ile giriş yapın.',
+                    appLoadError: 'Uygulama yüklenemedi. Lütfen tekrar deneyin.',
+                    botListError: 'Bot listesi yüklenemedi.',
                 },
                 en: {
                     pointsSuffix: 'Points',
@@ -336,15 +423,24 @@
                     addedBotsDesc: 'Only bots whose owners have enough points (>=10) are listed here.',
                     noBotsAvailable: 'No eligible bots to display.',
                     cancelBtn: 'Cancel',
+                    loading: 'Loading...',
+                    authFailed: 'Authentication failed. Please try again.',
+                    loginTitle: 'Log In',
+                    loginDesc: 'Please log in with Telegram to continue.',
+                    appLoadError: 'Could not load the application. Please try again.',
+                    botListError: 'Could not load bot list.',
                 }
             };
 
             // --- STATE ---
-            let appData = {}; // Holds { users: {}, botLinks: [] }
-            let currentUser = { id: 'guest', username: 'Guest', points: 0 };
+            let currentUserData = null; // Holds Firestore data for the logged-in user
+            let allEligibleBots = [];
             let currentLanguage = 'tr';
 
             // --- DOM ELEMENTS ---
+            const loaderEl = document.getElementById('loader');
+            const appContainer = document.querySelector('.app-container');
+            const loginContainer = document.getElementById('login-container');
             const usernameEl = document.getElementById('username');
             const pointsEl = document.getElementById('points');
             const addBotInput = document.getElementById('add-bot-input');
@@ -361,91 +457,50 @@
             const cancelVisitBtn = document.getElementById('cancel-visit-btn');
 
             // --- VISIT BOT TASK STATE ---
-            let visitTask = {
-                active: false,
-                startTime: 0,
-                chosenBot: null,
+            let visitTask = { active: false, startTime: 0, chosenBot: null, intervalId: null };
+
+            // --- HELPER FUNCTIONS ---
+            const showLoader = (show) => {
+                loaderEl.style.display = show ? 'flex' : 'none';
             };
 
-            // --- FUNCTIONS ---
-            const loadState = () => {
-                currentLanguage = localStorage.getItem('botPointsLang') || 'tr';
-
-                const savedData = JSON.parse(localStorage.getItem('botPointsAppData'));
-                if (savedData && savedData.users) {
-                    appData = savedData;
-                } else {
-                    appData = {
-                        users: { 'system': { username: 'System', points: 999999 } },
-                        botLinks: [
-                            { url: 'https://t.me/SpamBot', owner: 'system' },
-                            { url: 'https://t.me/Stickers', owner: 'system' }
-                        ]
-                    };
-                }
-
-                let userId = 'guest';
-                let userName = translations[currentLanguage].guest;
-                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                    userId = tg.initDataUnsafe.user.id.toString();
-                    userName = tg.initDataUnsafe.user.first_name || tg.initDataUnsafe.user.username || 'User';
-                }
-
-                if (!appData.users[userId]) {
-                    appData.users[userId] = { username: userName, points: 100, visitedBots: [] };
-                } else if (!appData.users[userId].visitedBots) {
-                    // For existing users from old state, ensure visitedBots exists
-                    appData.users[userId].visitedBots = [];
-                }
-                
-                currentUser = {
-                    id: userId,
-                    username: appData.users[userId].username,
-                    points: appData.users[userId].points
-                };
-
-                saveState();
+            const showToast = (message, type = 'success') => {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.classList.add('show'), 10);
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => document.body.contains(toast) && document.body.removeChild(toast), 300);
+                }, 3000);
             };
 
-            const saveState = () => {
-                if (appData.users[currentUser.id]) {
-                    appData.users[currentUser.id].points = currentUser.points;
-                }
-                localStorage.setItem('botPointsAppData', JSON.stringify(appData));
-            };
-
+            // --- LANGUAGE ---
             const setLanguage = (lang) => {
                 currentLanguage = lang;
                 localStorage.setItem('botPointsLang', lang);
-
                 langTrBtn.classList.toggle('active', lang === 'tr');
                 langEnBtn.classList.toggle('active', lang === 'en');
-
                 document.querySelectorAll('[data-key]').forEach(el => {
                     const key = el.dataset.key;
                     if (translations[lang][key]) {
-                        if (el.tagName === 'INPUT' && el.placeholder) {
-                            el.placeholder = translations[lang][key];
-                        } else {
-                           el.textContent = translations[lang][key];
-                        }
+                        if (el.tagName === 'INPUT' && el.placeholder) el.placeholder = translations[lang][key];
+                        else el.textContent = translations[lang][key];
                     }
                 });
                 updateUI();
             };
-            
+
+            // --- UI UPDATE ---
             const renderBotList = () => {
                 const T = translations[currentLanguage];
-                botListContainer.innerHTML = ''; 
-
-                const eligibleBots = appData.botLinks.filter(bot => appData.users[bot.owner] && appData.users[bot.owner].points >= 10);
-
-                if (eligibleBots.length === 0) {
-                    botListContainer.innerHTML = `<p style="font-size:0.9em; text-align:center;">${T.noBotsAvailable || ''}</p>`;
+                botListContainer.innerHTML = '';
+                if (allEligibleBots.length === 0) {
+                    botListContainer.innerHTML = `<p style="font-size:0.9em; text-align:center;">${T.noBotsAvailable}</p>`;
                     return;
                 }
-
-                eligibleBots.forEach(bot => {
+                allEligibleBots.forEach(bot => {
                     const item = document.createElement('div');
                     item.className = 'bot-item';
                     item.textContent = bot.url;
@@ -454,171 +509,241 @@
             };
 
             const updateUI = () => {
+                const firebaseUser = auth.currentUser;
+                if (!firebaseUser || !currentUserData) {
+                    // Reset UI for logged-out state
+                    usernameEl.textContent = translations[currentLanguage].guest;
+                    pointsEl.textContent = `💰 0 ${translations[currentLanguage].pointsSuffix}`;
+                    return;
+                };
+
                 const T = translations[currentLanguage];
+                usernameEl.textContent = currentUserData.username;
+                pointsEl.textContent = `💰 ${currentUserData.points} ${T.pointsSuffix}`;
                 
-                usernameEl.textContent = currentUser.username;
-                pointsEl.textContent = `💰 ${currentUser.points} ${T.pointsSuffix}`;
-                
-                watchAdBtn.textContent = T.watchAdBtn;
-                visitBotBtn.textContent = T.visitBotBtn;
+                addBotBtn.disabled = currentUserData.points < 10;
+                addBotBtn.textContent = currentUserData.points < 10 ? T.insufficientPoints : T.addBotBtn;
 
-                addBotBtn.disabled = currentUser.points < 10;
-                if (currentUser.points < 10) {
-                    addBotBtn.textContent = T.insufficientPoints;
-                } else {
-                    addBotBtn.textContent = T.addBotBtn;
-                }
-
-                const visitedBots = appData.users[currentUser.id]?.visitedBots || [];
-                const eligibleBotsForVisit = appData.botLinks.filter(bot => 
-                    bot.owner !== currentUser.id && 
-                    appData.users[bot.owner] && 
-                    appData.users[bot.owner].points >= 10 &&
-                    !visitedBots.includes(bot.url)
+                const visitableBots = allEligibleBots.filter(bot => 
+                    bot.ownerId !== firebaseUser.uid && 
+                    (!currentUserData.visitedBots || !currentUserData.visitedBots.includes(bot.url))
                 );
-                visitBotBtn.disabled = eligibleBotsForVisit.length === 0;
+                visitBotBtn.disabled = visitableBots.length === 0;
 
                 renderBotList();
             };
 
-            const showToast = (message, type = 'success') => {
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                toast.textContent = message;
-                document.body.appendChild(toast);
+            // --- FIREBASE DATA ---
+            const fetchEligibleBots = async () => {
+                // This approach is more robust against missing Firestore indexes.
+                // It fetches all bots and all users and filters on the client.
+                // May be slow with very large collections, but avoids query errors.
+                try {
+                    const botsSnapshot = await getDocs(collection(db, "bots"));
+                    const allBots = [];
+                    botsSnapshot.forEach(doc => allBots.push({ id: doc.id, ...doc.data() }));
 
-                setTimeout(() => toast.classList.add('show'), 10);
-                setTimeout(() => {
-                    toast.classList.remove('show');
-                    setTimeout(() => {
-                        if (document.body.contains(toast)) {
-                           document.body.removeChild(toast);
+                    if (allBots.length === 0) {
+                        allEligibleBots = [];
+                        return;
+                    }
+
+                    const usersSnapshot = await getDocs(collection(db, "users"));
+                    const usersMap = new Map();
+                    usersSnapshot.forEach(doc => usersMap.set(doc.id, doc.data()));
+                    
+                    allEligibleBots = allBots.filter(bot => {
+                        const owner = usersMap.get(bot.ownerId);
+                        return owner && owner.points >= 10;
+                    });
+                } catch (error) {
+                    console.error("Error fetching eligible bots:", error);
+                    showToast(translations[currentLanguage].botListError, "error");
+                    allEligibleBots = [];
+                }
+            };
+
+            const initializeUserData = async (firebaseUser) => {
+                showLoader(true);
+                try {
+                    const userRef = doc(db, "users", firebaseUser.uid);
+                    const userSnap = await getDoc(userRef);
+
+                    if (userSnap.exists()) {
+                        currentUserData = { id: firebaseUser.uid, ...userSnap.data() };
+                    } else {
+                        let userName = 'User';
+                        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                            userName = tg.initDataUnsafe.user.first_name || tg.initDataUnsafe.user.username || 'User';
+                        } else if (firebaseUser.displayName) {
+                            userName = firebaseUser.displayName;
                         }
-                    }, 300);
-                }, 3000);
+                        
+                        currentUserData = { id: firebaseUser.uid, username: userName, points: 100, visitedBots: [] };
+                        await setDoc(userRef, { username: userName, points: 100, visitedBots: [] });
+                    }
+                    
+                    await fetchEligibleBots();
+                    updateUI();
+                    appContainer.style.display = 'flex';
+                    loginContainer.style.display = 'none';
+                } finally {
+                    showLoader(false);
+                }
             };
 
-            const changePoints = (amount) => {
-                currentUser.points += amount;
-                updateUI();
+
+            // --- CORE LOGIC ---
+            const changePoints = async (amount) => {
+                if (!auth.currentUser || !currentUserData) {
+                    showToast(translations[currentLanguage].authFailed, 'error');
+                    throw new Error("User not authenticated or data not loaded");
+                }
+                currentUserData.points += amount;
+                updateUI(); // Optimistic update
+                const userRef = doc(db, "users", auth.currentUser.uid);
+                await updateDoc(userRef, { points: currentUserData.points });
             };
 
-            const handleAddBot = () => {
+            const handleAddBot = async () => {
                 const T = translations[currentLanguage];
+                if (!auth.currentUser) {
+                    showToast(T.authFailed, 'error');
+                    return;
+                }
                 if (addBotBtn.disabled) return;
                 const link = addBotInput.value.trim();
                 if (!link.startsWith('https://t.me/')) {
                     showToast(T.invalidBotLink, 'error');
                     return;
                 }
-
-                if (currentUser.points < 10) {
+                if (currentUserData.points < 10) {
                     showToast(T.notEnoughPointsError, 'error');
                     return;
                 }
 
-                changePoints(-10);
-                appData.botLinks.push({ url: link, owner: currentUser.id });
-                saveState();
-                updateUI();
-                addBotInput.value = '';
-                showToast(T.botAddedSuccess);
-            };
+                showLoader(true);
+                try {
+                    await runTransaction(db, async (transaction) => {
+                        const userRef = doc(db, "users", auth.currentUser.uid);
+                        const userDoc = await transaction.get(userRef);
+                        if (!userDoc.exists() || userDoc.data().points < 10) {
+                            throw new Error(T.notEnoughPointsError);
+                        }
+                        
+                        const newPoints = userDoc.data().points - 10;
+                        transaction.update(userRef, { points: newPoints });
+                        
+                        const newBotRef = doc(collection(db, "bots"));
+                        transaction.set(newBotRef, { url: link, ownerId: auth.currentUser.uid });
+                    });
 
+                    currentUserData.points -= 10;
+                    addBotInput.value = '';
+                    showToast(T.botAddedSuccess);
+                    await fetchEligibleBots();
+                    updateUI();
+                } catch (error) {
+                    console.error("Add bot transaction failed: ", error);
+                    showToast(error.message || 'Error adding bot.', 'error');
+                } finally {
+                    showLoader(false);
+                }
+            };
+            
             const handleWatchAd = () => {
+                if (!auth.currentUser) {
+                    showToast(translations[currentLanguage].authFailed, 'error');
+                    return;
+                }
                 const T = translations[currentLanguage];
                 watchAdBtn.disabled = true;
                 watchAdBtn.textContent = T.adLoading;
-
-                show_9448585().then(() => {
-                    changePoints(10);
-                    saveState();
-                    showToast(T.adWatchedSuccess);
+                show_9448585().then(async () => {
+                    try {
+                        await changePoints(10);
+                        showToast(T.adWatchedSuccess);
+                    } catch (e) {
+                        console.error("Failed to award points:", e.message);
+                        showToast(T.adError, 'error');
+                    }
                 }).catch((error) => {
                     showToast(T.adError, 'error');
                     console.error("Ad error:", error);
                 }).finally(() => {
                     watchAdBtn.disabled = false;
-                    updateUI();
+                    // updateUI will be called by changePoints
                 });
             };
 
             const resetVisitTask = () => {
+                if (visitTask.intervalId) clearInterval(visitTask.intervalId);
+                timerEl.textContent = '5';
                 document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
-                visitTask.active = false;
-                visitTask.chosenBot = null;
-                visitTask.startTime = 0;
-                
+                visitTask = { active: false, startTime: 0, chosenBot: null, intervalId: null };
                 earnPointsCard.style.display = 'flex';
                 visitTaskCard.style.display = 'none';
-                timerEl.style.display = 'block';
             };
 
             const handleVisitFail = async () => {
+                resetVisitTask();
                 const T = translations[currentLanguage];
                 showToast(T.visitTaskFail, 'error');
-
                 try {
-                    for (let i = 0; i < 4; i++) {
-                        await show_9448585();
-                    }
+                    for (let i = 0; i < 4; i++) { await show_9448585(); }
                 } catch (error) {
                     console.error('Ad error during visit task (fail case):', error);
                     showToast(T.adErrorDuringVisit, 'error');
-                } finally {
-                    resetVisitTask();
-                    updateUI();
                 }
+                updateUI();
             };
 
             const handleVisitSuccess = async () => {
                 const T = translations[currentLanguage];
                 showToast(T.visitTaskSuccess, 'info');
-
+                
                 try {
-                    for (let i = 0; i < 4; i++) {
-                        await show_9448585();
-                    }
+                    for (let i = 0; i < 4; i++) { await show_9448585(); }
 
-                    // If all ads were shown successfully:
-                    changePoints(10);
-                    const owner = appData.users[visitTask.chosenBot.owner];
-                    if (owner) {
-                        owner.points -= 10;
-                    }
-                    if (!appData.users[currentUser.id].visitedBots) {
-                        appData.users[currentUser.id].visitedBots = [];
-                    }
-                    appData.users[currentUser.id].visitedBots.push(visitTask.chosenBot.url);
-                    saveState();
+                    await runTransaction(db, async (transaction) => {
+                        const visitorRef = doc(db, "users", auth.currentUser.uid);
+                        const ownerRef = doc(db, "users", visitTask.chosenBot.ownerId);
+
+                        const ownerDoc = await transaction.get(ownerRef);
+                        if (!ownerDoc.exists() || ownerDoc.data().points < 10) {
+                            throw new Error("Bot owner has insufficient points.");
+                        }
+
+                        transaction.update(ownerRef, { points: ownerDoc.data().points - 10 });
+                         // Fetch visitor doc to prevent race conditions with points
+                        const visitorDoc = await transaction.get(visitorRef);
+                        const newPoints = (visitorDoc.data().points || 0) + 10;
+                        transaction.update(visitorRef, { points: newPoints, visitedBots: arrayUnion(visitTask.chosenBot.url) });
+                    });
+
+                    currentUserData.points += 10;
+                    currentUserData.visitedBots.push(visitTask.chosenBot.url);
                     showToast(T.visitTaskCompleted);
 
                 } catch (error) {
-                    console.error('Ad error during visit task:', error);
+                    console.error('Visit success transaction or ad error:', error);
                     showToast(T.adErrorDuringVisit, 'error');
                 } finally {
                     resetVisitTask();
+                    await fetchEligibleBots();
                     updateUI();
                 }
             };
 
             const handleVisibilityChangeForVisit = () => {
                 if (!visitTask.active) return;
-
                 if (document.visibilityState === 'hidden' && visitTask.startTime === 0) {
-                    // User has left the page after clicking the link
                     visitTask.startTime = Date.now();
                 } else if (document.visibilityState === 'visible' && visitTask.startTime > 0) {
-                    // User has returned
-                    const elapsed = Date.now() - visitTask.startTime;
-                    
                     document.removeEventListener('visibilitychange', handleVisibilityChangeForVisit);
-                    
-                    if (elapsed >= 5000) {
-                        handleVisitSuccess();
-                    } else {
-                        handleVisitFail();
-                    }
+                    const elapsed = Date.now() - visitTask.startTime;
+                    if (elapsed >= 5000) handleVisitSuccess();
+                    else handleVisitFail();
                 }
             };
             
@@ -626,13 +751,23 @@
                 visitTask.active = true;
                 visitTask.chosenBot = bot;
                 visitTask.startTime = 0;
-
                 earnPointsCard.style.display = 'none';
                 visitTaskCard.style.display = 'flex';
-                timerEl.style.display = 'none'; // Hide the timer element as it's not used in this flow
                 visitBotLinkEl.href = bot.url;
 
-                // Add the visibility listener only after the user clicks the link
+                let countdown = 5;
+                timerEl.textContent = countdown;
+                if (visitTask.intervalId) clearInterval(visitTask.intervalId); // Clear any old timers
+                visitTask.intervalId = setInterval(() => {
+                    countdown--;
+                    if (countdown >= 0) {
+                        timerEl.textContent = countdown;
+                    } else {
+                        timerEl.textContent = "✅";
+                        clearInterval(visitTask.intervalId);
+                    }
+                }, 1000);
+
                 visitBotLinkEl.addEventListener('click', () => {
                     document.addEventListener('visibilitychange', handleVisibilityChangeForVisit);
                 }, { once: true });
@@ -640,20 +775,20 @@
 
             const handleVisitBot = () => {
                 const T = translations[currentLanguage];
-                const visitedBots = appData.users[currentUser.id].visitedBots || [];
-                const eligibleBots = appData.botLinks.filter(bot => 
-                    bot.owner !== currentUser.id && 
-                    appData.users[bot.owner] && 
-                    appData.users[bot.owner].points >= 10 &&
-                    !visitedBots.includes(bot.url)
+                if (!auth.currentUser) {
+                    showToast(T.authFailed, 'error');
+                    return;
+                }
+                const visitableBots = allEligibleBots.filter(bot => 
+                    bot.ownerId !== auth.currentUser.uid && 
+                    (!currentUserData.visitedBots || !currentUserData.visitedBots.includes(bot.url))
                 );
 
-                if (eligibleBots.length === 0) {
+                if (visitableBots.length === 0) {
                     showToast(T.noBotsToVisit, 'info');
                     return;
                 }
-
-                const chosenBot = eligibleBots[Math.floor(Math.random() * eligibleBots.length)];
+                const chosenBot = visitableBots[Math.floor(Math.random() * visitableBots.length)];
                 startVisitTask(chosenBot);
             };
 
@@ -668,10 +803,80 @@
             langTrBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('tr'); });
             langEnBtn.addEventListener('click', (e) => { e.preventDefault(); setLanguage('en'); });
 
-            // --- INITIALIZATION ---
-            loadState();
-            setLanguage(currentLanguage);
+            // --- AUTHENTICATION ---
+            const authFunctionUrl = "https://sharebots.onrender.com/authTelegram";
+            
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    try {
+                        // User is signed in, get their data.
+                        await initializeUserData(user);
+                    } catch (error) {
+                        console.error("Critical error during user initialization:", error);
+                        const T = translations[currentLanguage];
+                        showToast(T.appLoadError, 'error');
+                        // If initialization fails, sign out to reset state.
+                        await auth.signOut();
+                    }
+                } else {
+                    // User is signed out, show login UI.
+                    currentUserData = null;
+                    appContainer.style.display = 'none';
+                    loginContainer.style.display = 'block';
+                    showLoader(false);
+                }
+            });
 
+            const mainAuthFlow = async () => {
+                const params = new URLSearchParams(window.location.search);
+                const token = params.get('token');
+                const tg = window.Telegram.WebApp;
+
+                try {
+                    // Case 1: Token is in the URL after redirect from auth function.
+                    if (token) {
+                        showLoader(true);
+                        await signInWithCustomToken(auth, token);
+                        // Clean the URL to prevent re-using the token on refresh
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        // onAuthStateChanged will handle the rest (hide loader, show app).
+                        return; // Auth process is done for this path.
+                    }
+
+                    // Case 2: Running inside Telegram Web App for the first time (no token yet).
+                    // We need to redirect to the auth function to get a token.
+                    if (tg.initData && tg.initData.length > 0) {
+                        showLoader(true);
+                        // The entire page will be redirected to the auth function,
+                        // which will then redirect back here with a token.
+                        window.location.href = `${authFunctionUrl}?${tg.initData}`;
+                        return; // The script will stop execution here due to redirect.
+                    }
+
+                    // Case 3: Not authenticated on web, no token, not in TG.
+                    // The onAuthStateChanged listener (already set up) will see no user is logged in
+                    // and will show the login container. The login widget will handle
+                    // redirecting to the auth function when clicked.
+                    // We can just ensure the loader is hidden if we reach this point.
+                    showLoader(false);
+
+                } catch (err) {
+                    console.error("Authentication error:", err);
+                    // This catch is mainly for signInWithCustomToken failure (e.g., invalid token).
+                    showToast(translations[currentLanguage].authFailed, 'error');
+                    showLoader(false);
+                    // Clear broken token from URL
+                    if (params.has('token')) {
+                         window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                    // onAuthStateChanged will ensure login is shown.
+                }
+            };
+            
+            // --- INITIALIZATION ---
+            const savedLang = localStorage.getItem('botPointsLang') || 'tr';
+            setLanguage(savedLang); // Set language first for correct messages
+            await mainAuthFlow(); // Start auth process
         });
     </script>
 </body>
