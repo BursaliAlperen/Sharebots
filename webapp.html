@@ -1,0 +1,45 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mini App</title>
+  <meta charset="UTF-8">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body { background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
+    button { padding: 10px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h2>Hoş geldin <span id="user"></span></h2>
+  <p id="result"></p>
+  <button onclick="kaydet()">Kendini Kaydet</button>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    const user = tg.initDataUnsafe.user;
+    document.getElementById("user").innerText = user.username || user.first_name;
+
+    function getReferrer() {
+      const query = new URLSearchParams(window.location.search);
+      return query.get("ref");
+    }
+
+    async function kaydet() {
+      const response = await fetch("https://senin-api-urlin.onrender.com/kayit", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          id: user.id,
+          username: user.username,
+          referrer: getReferrer()
+        })
+      });
+
+      const data = await response.json();
+      document.getElementById("result").innerText = data.message || "Kayıt edildi!";
+    }
+  </script>
+</body>
+</html>
